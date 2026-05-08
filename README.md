@@ -3,8 +3,7 @@
 > This file must contain **exclusively the technical aspects** of the project (Setup, Run, baseline Results). The textual and theoretical report should be placed in the **[`docs/REPORT.md`](docs/REPORT.md)** file.
 > *Delete this note block before submission.*
 
-# [Vision-Language-Alignment-with-CLIP-for-Video
-]
+# Vision-Language-Alignment-with-CLIP-for-Video
 
 [![Report](https://img.shields.io/badge/Paper-REPORT.md-blue)](docs/REPORT.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -14,8 +13,7 @@
 - **Project ID**: 15
 
 ## 📝 Project Description
-A brief paragraph (3-4 lines) that visually and concisely describes the project, the main implemented model, and the task addressed. 
-*(Imagine this is the technical Abstract of your GitHub repo).*
+Searching for videos traditionally relies on manually curated metadata rather than visual content. This project explores zero-shot cross-modal retrieval by aligning video features with natural language text using a contrastive loss model reminiscent of CLIP.*
 
 > 📖 **Official Report**: For all theoretical details, performance analysis, the architecture used, and group contributions, please refer to our formal paper: **[REPORT.md](docs/REPORT.md)**.
 
