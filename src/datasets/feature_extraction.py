@@ -15,22 +15,29 @@ from tqdm import tqdm
 distilbert_tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased-finetuned-sst-2-english")
 
 train_dataset = EpicKitchensFramesDataset(
-    csv_file='../data/annotations/processed/train.csv', 
-    frames_dir = '../data/sampled/train', 
+    csv_file='./data/annotations/processed/train.csv', 
+    frames_dir = './data/sampled/train', 
     tokenizer = distilbert_tokenizer,
     mode='val'
 )
 
-val_seen_dataset = EpicKitchensFramesDataset(
-    csv_file='../data/annotations/processed/val_seen.csv', 
-    frames_dir = '../data/sampled/val_seen', 
+val_dataset = EpicKitchensFramesDataset(
+    csv_file='./data/annotations/processed/val.csv', 
+    frames_dir = './data/sampled/val', 
     tokenizer = distilbert_tokenizer,
     mode='val'
 )
 
-val_zeroshot = EpicKitchensFramesDataset(
-    csv_file='../data/annotations/processed/val_zeroshot.csv', 
-    frames_dir = '../data/sampled/val_zeroshot', 
+test_seen_dataset = EpicKitchensFramesDataset(
+    csv_file='./data/annotations/processed/test_seen.csv', 
+    frames_dir = './data/sampled/test_seen', 
+    tokenizer = distilbert_tokenizer,
+    mode='val'
+)
+
+test_zeroshot = EpicKitchensFramesDataset(
+    csv_file='./data/annotations/processed/test_zeroshot.csv', 
+    frames_dir = './data/sampled/test_zeroshot', 
     tokenizer = distilbert_tokenizer,
     mode='val'
 )
@@ -43,20 +50,20 @@ train_loader = torch.utils.data.DataLoader(
     shuffle=False
 )
 
-val_seen_loader = torch.utils.data.DataLoader(
-    val_seen_dataset,
+val_loader = torch.utils.data.DataLoader(
+    val_dataset,
     batch_size=batch_size,
     shuffle=False
 )
 
-val_zeroshot_loader = torch.utils.data.DataLoader(
-    val_zeroshot,
+test_seen_loader = torch.utils.data.DataLoader(
+    test_seen_dataset,
     batch_size=batch_size,
     shuffle=False
 )
 
-val_zeroshot_loader = torch.utils.data.DataLoader(
-    val_zeroshot,
+test_zeroshot_loader = torch.utils.data.DataLoader(
+    test_zeroshot,
     batch_size=batch_size,
     shuffle=False
 )
@@ -77,9 +84,9 @@ with torch.no_grad():
     text_encoder.eval().to(device)
     video_encoder.eval().to(device)
 
-    files = ['features_train.pt', 'features_val_seen.pt', 'features_val_zeroshot.pt']
+    files = ['features_train.pt', 'features_val.pt', 'features_test_seen.pt', 'features_test_zeroshot.pt']
     k = 0
-    for loader in [train_loader, val_seen_loader, val_zeroshot_loader]:
+    for loader in [train_loader, val_loader, test_seen_loader, test_zeroshot_loader]:
         
         dataset_features = {}
         for batch in tqdm(loader, desc=f"Extracting Features for loader {k}"):
@@ -106,7 +113,7 @@ with torch.no_grad():
                     'video': video_embeddings[i]
                 }
         
-        torch.save(dataset_features, '../data/features/' + files[k])
+        torch.save(dataset_features, './data/features/' + files[k])
         k = k +1
 
 print("Process completed successfully")

@@ -58,7 +58,7 @@ if __name__ == "__main__":
     
     OUTPUT_ROOT = "./data/sampled/"
 
-    for s in ["train", "val_seen", "val_zeroshot"]:
+    for s in ["train", 'val', "test_seen", "test_zeroshot"]:
         output_dir = os.path.join(OUTPUT_ROOT, s)
         os.makedirs(output_dir, exist_ok=True)
     
