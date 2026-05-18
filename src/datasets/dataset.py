@@ -91,7 +91,8 @@ class EpicKitchensFeatureDataset(Dataset):
         return len(self.keys)
     
     def __getitem__(self, idx):
-        return self.features[self.keys[idx]]
+        tensor = self.features[self.keys[idx]]
+        return (tensor['text'], tensor['video'])
     
 class EpicKitchensFeatureModule(LightningDataModule):
     def __init__(self, features_dir, batch_size, num_workers):
