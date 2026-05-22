@@ -32,7 +32,7 @@ class Adapter(nn.Module):
         self.log_t = nn.Parameter(
             torch.ones([]) * np.log(1/ 0.07)
         )
-        
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
         self.video_mlp = MLP(**video_mlp_config)
         self.text_mlp = MLP(**text_mlp_config)
 
@@ -50,7 +50,7 @@ class Adapter(nn.Module):
 
         logits = sim_matrix * temperature
         batch_size = v_e.size(0)
-        labels = torch.arange(batch_size, device="mps")
+        labels = torch.arange(batch_size, device=self.device)
         loss_t = F.cross_entropy(logits, labels)
         loss_v = F.cross_entropy(logits.T, labels)
 
@@ -79,10 +79,10 @@ class AdapterModule(LightningModule):
         video, text = batch
         video_output, text_output = self.model(video, text)
         loss, sim_matrix = self.model.get_clip_loss(video_output, text_output)
-        self.log('val/loss', loss)
+        self.log('val/loss', loss,on_step=False, on_epoch=True)
         recalls = compute_recall(sim_matrix, len(video_output), "val/")
 
-        self.log_dict(recalls)
+        self.log_dict(recalls,on_step=False, on_epoch=True)
         return loss
     
     def test_step(self, *args, **kwargs):

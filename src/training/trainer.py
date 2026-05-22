@@ -50,12 +50,13 @@ class AdapterTrainer():
             accelerator = train_config['accelerator'],
             max_epochs = train_config['max_epochs'],
             logger = self.logger,
-            callbacks = callbacks
+            callbacks = callbacks,
+            log_every_n_steps = 50
         )
         self.module = EpicKitchensFeatureModule(
             features_dir='./data/features',
             batch_size=train_config['batch_size'],
-            num_workers=train_config['num_workers']
+            num_workers=train_config['num_workers'],
         )
         self.module.setup('fit')
         
@@ -64,6 +65,6 @@ class AdapterTrainer():
         
 
 if __name__ == "__main__":
-    trainer = AdapterTrainer("experiments/configs/config2.yaml")
+    trainer = AdapterTrainer("experiments/configs/config.yaml")
     trainer.train()
     # CLI 

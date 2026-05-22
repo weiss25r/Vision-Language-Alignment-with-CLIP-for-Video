@@ -111,10 +111,24 @@ class EpicKitchensFeatureModule(LightningDataModule):
             self.test_zeroshot_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_test_zeroshot.pt'))
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=True)
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=True,
+            persistent_workers=True if self.num_workers > 0 else False,
+            pin_memory=True
+        )
     
     def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=False)
+        return DataLoader(
+            self.val_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=False,
+            persistent_workers=True if self.num_workers > 0 else False,
+            pin_memory=True
+        )
 
     def test_dataloader(self):
         dl_seen = DataLoader(self.test_seen_dataset, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=False)
