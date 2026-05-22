@@ -1,27 +1,27 @@
 train_config:
-  learning_rate: 0.0005
-  weight_decay: 0.0001
-  max_epochs: 100
-  eta_min: 0.000001
-  batch_size: 64
+  learning_rate: 0.001
+  weight_decay: 0.001
+  max_epochs: 30
+  batch_size: 32
   num_workers: 4
-  temperature: 0.7
   accelerator: gpu
+  patience: 5
 
 model_config:
   text_mlp:
     in_dim: 768
     hidden_dim: 768
-    out_dim: 256
-    dropout: 0.1
+    out_dim: 512
+    dropout: 0.0
   video_mlp:
     in_dim: 768
     hidden_dim: 768
-    out_dim: 256
-    dropout: 0.1
+    out_dim: 512
+    dropout: 0.0
 
 logging_config:
-  project_name: "adapter_test"
-  exp_name: "adapter_test_code"
-  log_dir: "experiments/logs"
-  checkpoint_dir: "experiments/checkpoints"
+  project_name: ""
+  exp_name: ""
+  log_dir: "experiments/logs/"
+  checkpoint_dir: "experiments/checkpoints/"
+  checkpoint_name: ""

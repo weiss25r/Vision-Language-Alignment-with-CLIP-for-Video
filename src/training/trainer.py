@@ -21,11 +21,8 @@ class AdapterTrainer():
         train_config = config['train_config']
 
         self.model = AdapterModule(
-            temperature=train_config['temperature'],
             lr=train_config['learning_rate'],
             weight_decay=train_config['weight_decay'],
-            max_epochs=train_config['max_epochs'],
-            eta_min=train_config['eta_min'],
             adapter_config=config['model_config']
         )
 
@@ -39,7 +36,7 @@ class AdapterTrainer():
 
         callbacks = [
             LearningRateMonitor(logging_interval='step'),
-            EarlyStopping(monitor='val/loss', patience=10, mode='min', verbose=True),
+            EarlyStopping(monitor='val/loss', patience=train_config['patience'], mode='min', verbose=True),
             ModelCheckpoint(
                 dirpath = logging_config['checkpoint_dir'],
                 monitor='val/loss',
@@ -67,6 +64,6 @@ class AdapterTrainer():
         
 
 if __name__ == "__main__":
-    trainer = AdapterTrainer("experiments\configs\config.yaml")
+    trainer = AdapterTrainer("experiments/configs/config2.yaml")
     trainer.train()
     # CLI 
