@@ -8,6 +8,10 @@ import numpy as np
 import pandas as pd
 import os
 
+from torch.utils.data import DataLoader
+
+from lightning import LightningDataModule
+
 from ..utils.sampling_utils import get_uniform_frame_indices
 
 class EpicKitchensFramesDataset(Dataset):
@@ -15,6 +19,8 @@ class EpicKitchensFramesDataset(Dataset):
         self.df = pd.read_csv(csv_file)
         self.frames_dir = frames_dir
         self.tokenizer = tokenizer
+
+        # Normalization using mean and std of ImageNet
         self.mean = [0.485, 0.456, 0.406]
         self.std = [0.229, 0.224, 0.225]
         
@@ -74,3 +80,57 @@ class EpicKitchensFramesDataset(Dataset):
             'text_attention_mask': text_inputs['attention_mask']
         }
         
+
+class EpicKitchensFeatureDataset(Dataset):
+    def __init__(self, features_path):
+        with open(features_path, 'rb') as f:
+            self.features = torch.load(f)
+            self.keys = list(self.features.keys())
+    
+    def __len__(self):
+        return len(self.keys)
+    
+    def __getitem__(self, idx):
+        tensor = self.features[self.keys[idx]]
+        return (tensor['text'], tensor['video'])
+    
+class EpicKitchensFeatureModule(LightningDataModule):
+    def __init__(self, features_dir, batch_size, num_workers):
+        super().__init__()
+        self.features_dir = features_dir
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.save_hyperparameters()
+
+    def setup(self, stage=None):
+        if stage == 'fit':
+            self.train_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_train.pt'))
+            self.val_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_val.pt'))        
+        if stage == 'test':
+            self.test_seen_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_test_seen.pt'))
+            self.test_zeroshot_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_test_zeroshot.pt'))
+
+    def train_dataloader(self):
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=True,
+            persistent_workers=True if self.num_workers > 0 else False,
+            pin_memory=True
+        )
+    
+    def val_dataloader(self):
+        return DataLoader(
+            self.val_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=False,
+            persistent_workers=True if self.num_workers > 0 else False,
+            pin_memory=True
+        )
+
+    def test_dataloader(self):
+        dl_seen = DataLoader(self.test_seen_dataset, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=False)
+        dl_zeroshot = DataLoader(self.test_zeroshot_dataset, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=False)
+        return [dl_seen, dl_zeroshot]

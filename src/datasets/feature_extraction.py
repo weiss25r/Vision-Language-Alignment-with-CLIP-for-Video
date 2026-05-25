@@ -12,7 +12,9 @@ from transformers import DistilBertModel, TimesformerModel
 from transformers import AutoTokenizer
 from tqdm import tqdm
 
-distilbert_tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased-finetuned-sst-2-english")
+distilbert_tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
+text_model = DistilBertModel.from_pretrained("distilbert-base-uncased")
+video_model = TimesformerModel.from_pretrained("facebook/timesformer-base-finetuned-k600")
 
 train_dataset = EpicKitchensFramesDataset(
     csv_file='./data/annotations/processed/train.csv', 
@@ -70,10 +72,7 @@ test_zeroshot_loader = torch.utils.data.DataLoader(
 
 device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
 
-text_model = DistilBertModel.from_pretrained("distilbert-base-uncased-finetuned-sst-2-english")
 text_encoder = TextEncoder(text_model).to(device)
-
-video_model = TimesformerModel.from_pretrained("facebook/timesformer-base-finetuned-k600")
 video_encoder = VideoEncoder(video_model).to(device)
 
 text_encoder.eval().to(device)
@@ -100,12 +99,14 @@ with torch.no_grad():
                 text_input_ids=text_input_ids,
                 text_attention_mask=text_attention_mask
             )
-           
-            text_embeddings = text_output.last_hidden_state[:, 0, :].cpu()
-            
+
+            input_mask_expanded = text_attention_mask.unsqueeze(-1).expand(text_output.last_hidden_state.size()).float()
+            sum_embeddings = torch.sum(text_output.last_hidden_state * input_mask_expanded, 1)
+            sum_mask = input_mask_expanded.sum(1).clamp(min=1e-9)
+            text_embeddings = (sum_embeddings / sum_mask).cpu()
+
             video_output = video_encoder(video_tensor)
-            
-            video_embeddings = video_output.last_hidden_state[:, 0, :].cpu()
+            video_embeddings = video_output.last_hidden_state.mean(dim=1).cpu() 
             
             for i, n_id in enumerate(narration_ids):
                 dataset_features[n_id] = {

@@ -1,0 +1,27 @@
+train_config:
+  learning_rate: 0.01
+  weight_decay: 0.01
+  max_epochs: 1000
+  batch_size: 4096
+  num_workers: 4
+  accelerator: gpu
+  patience: 10
+
+model_config:
+  text_mlp:
+    in_dim: 768
+    hidden_dim: 768
+    out_dim: 512
+    dropout: 0.1
+  video_mlp:
+    in_dim: 768
+    hidden_dim: 768
+    out_dim: 512
+    dropout: 0.1
+
+logging_config:
+  project_name: "big_batch_size"
+  exp_name: "exp_hope"
+  log_dir: "experiments/logs/"
+  checkpoint_dir: "experiments/checkpoints/"
+  checkpoint_name: "exp_hope"
