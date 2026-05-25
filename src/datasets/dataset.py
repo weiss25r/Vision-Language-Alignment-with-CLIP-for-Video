@@ -24,8 +24,9 @@ class EpicKitchensFramesDataset(Dataset):
         self.mean = [0.485, 0.456, 0.406]
         self.std = [0.229, 0.224, 0.225]
         
+        self.mode = mode
+
         if mode == 'val':
-            # Transforms for inference mode
             self.transforms = v2.Compose([
                 v2.ToImage(),
                 v2.Resize(224, antialias=True),
@@ -33,10 +34,19 @@ class EpicKitchensFramesDataset(Dataset):
                 v2.ToDtype(torch.float32, scale=True),
                 v2.Normalize(mean=self.mean, std=self.std)
             ])
-
-        #TODO: Add transforms for training
+        elif mode == 'train':
+            self.transforms = v2.Compose([
+                v2.ToImage(),
+                v2.Resize(256, antialias=True),
+                v2.RandomCrop(224),
+                v2.ToDtype(torch.float32, scale=True),
+                v2.Normalize(mean=self.mean, std=self.std)
+            ])
+        else:
+            raise ValueError(f"Invalid mode: {mode}")
 
     def __len__(self):
+        
         return len(self.df)
 
     def __getitem__(self, idx):
@@ -45,7 +55,12 @@ class EpicKitchensFramesDataset(Dataset):
         narration_id = row['narration_id'] 
         video_id = row['video_id']
         
-        frame_indices = get_uniform_frame_indices(row['start_frame'], row['stop_frame'], strategy='center')
+        #random for training, center for validation
+        if self.mode == 'train':
+            frame_indices = get_uniform_frame_indices(row['start_frame'], row['stop_frame'], strategy='random')
+        else:
+            frame_indices = get_uniform_frame_indices(row['start_frame'], row['stop_frame'], strategy='center')
+
         video_dir = os.path.join(self.frames_dir, video_id)
         
         frames = []
@@ -56,7 +71,7 @@ class EpicKitchensFramesDataset(Dataset):
                 frame_path = os.path.join(video_dir, f"frame_{f_idx:010d}.jpg") 
                 
             img = Image.open(frame_path).convert('RGB')
-            img_tensor = self.transforms(img) # [C, H, W]
+            img_tensor = self.transforms(img)
             frames.append(img_tensor)
         
         #video tensor: [T, C, H, W]
@@ -79,7 +94,49 @@ class EpicKitchensFramesDataset(Dataset):
             'text_input_ids': text_inputs['input_ids'],
             'text_attention_mask': text_inputs['attention_mask']
         }
-        
+
+class EpicKitchensFramesModule(LightningDataModule):
+    def __init__(self, csv_file, frames_dir, tokenizer, batch_size, num_workers):
+        super().__init__()
+        self.csv_file = csv_file
+        self.frames_dir = frames_dir
+        self.tokenizer = tokenizer
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.save_hyperparameters()
+
+    def setup(self, stage=None):
+        if stage == 'fit':
+            self.train_dataset = EpicKitchensFramesDataset(self.csv_file, self.frames_dir, self.tokenizer, mode='train')
+            self.val_dataset = EpicKitchensFramesDataset(self.csv_file, self.frames_dir, self.tokenizer, mode='val')
+        if stage == 'test':
+            self.test_seen_dataset = EpicKitchensFramesDataset(self.csv_file, self.frames_dir, self.tokenizer, mode='val')
+            self.test_zeroshot_dataset = EpicKitchensFramesDataset(self.csv_file, self.frames_dir, self.tokenizer, mode='val')
+
+    def train_dataloader(self):
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=True,
+            persistent_workers=True if self.num_workers > 0 else False,
+            pin_memory=True
+        )
+    
+    def val_dataloader(self):
+        return DataLoader(
+            self.val_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=False,
+            persistent_workers=True if self.num_workers > 0 else False,
+            pin_memory=True
+        )
+
+    def test_dataloader(self):
+        dl_seen = DataLoader(self.test_seen_dataset, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=False)
+        dl_zeroshot = DataLoader(self.test_zeroshot_dataset, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=False)
+        return [dl_seen, dl_zeroshot]
 
 class EpicKitchensFeatureDataset(Dataset):
     def __init__(self, features_path):
