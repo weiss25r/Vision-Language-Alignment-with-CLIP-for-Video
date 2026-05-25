@@ -17,7 +17,11 @@ class MLP(nn.Module):
 
         self.net = nn.Sequential(
             nn.Linear(in_dim, hidden_dim),
-            nn.BatchNorm1d(hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.LayerNorm(hidden_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(hidden_dim, out_dim)
@@ -30,11 +34,12 @@ class Adapter(nn.Module):
     def __init__(self, video_mlp_config, text_mlp_config):
         super(Adapter, self).__init__()
         self.log_t = nn.Parameter(
-            torch.ones([]) * np.log(1/ 0.07)
+            torch.zeros([])
         )
         self.device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
         self.video_mlp = MLP(**video_mlp_config)
         self.text_mlp = MLP(**text_mlp_config)
+        
 
     def forward(self, video_input, text_input):
         video_output = self.video_mlp(video_input)
@@ -62,6 +67,8 @@ class AdapterModule(LightningModule):
     def __init__(self, lr, weight_decay, adapter_config):
         super(AdapterModule, self).__init__()
         self.model = Adapter(adapter_config["video_mlp"], adapter_config["text_mlp"])
+        self.val_video_embeddings = []
+        self.val_text_embeddings = []
         self.save_hyperparameters()
 
     def forward(self, video_input, text_input):
@@ -78,12 +85,28 @@ class AdapterModule(LightningModule):
     def validation_step(self, batch, batch_idx):
         video, text = batch
         video_output, text_output = self.model(video, text)
-        loss, sim_matrix = self.model.get_clip_loss(video_output, text_output)
+        loss, _ = self.model.get_clip_loss(video_output, text_output)
         self.log('val/loss', loss,on_step=False, on_epoch=True)
-        recalls = compute_recall(sim_matrix, len(video_output), "val/")
 
-        self.log_dict(recalls,on_step=False, on_epoch=True)
+        with torch.no_grad():
+            v_e = F.normalize(video_output, dim=1).detach().cpu()
+            t_e = F.normalize(text_output, dim=1).detach().cpu()
+
+            self.val_video_embeddings.append(v_e)
+            self.val_text_embeddings.append(t_e)
         return loss
+    
+    def on_validation_epoch_end(self):
+        all_videos = torch.cat(self.val_video_embeddings) # [Dim_Dataset, Embed_Dim]
+        all_texts = torch.cat(self.val_text_embeddings)   # [Dim_Dataset, Embed_Dim]
+
+        sim_matrix = torch.matmul(all_texts, all_videos.T)
+
+        recalls = compute_recall(sim_matrix, len(all_videos), "val/")
+        self.log_dict(recalls, on_step=False, on_epoch=True)
+
+        self.val_video_embeddings.clear()
+        self.val_text_embeddings.clear()
     
     def test_step(self, *args, **kwargs):
         #define seen and zero-shot
