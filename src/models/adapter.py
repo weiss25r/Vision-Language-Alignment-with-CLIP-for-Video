@@ -20,10 +20,6 @@ class MLP(nn.Module):
             nn.LayerNorm(hidden_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.LayerNorm(hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
             nn.Linear(hidden_dim, out_dim)
         )
 
@@ -36,7 +32,6 @@ class Adapter(nn.Module):
         self.log_t = nn.Parameter(
             torch.zeros([])
         )
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
         self.video_mlp = MLP(**video_mlp_config)
         self.text_mlp = MLP(**text_mlp_config)
         
@@ -55,7 +50,7 @@ class Adapter(nn.Module):
 
         logits = sim_matrix * temperature
         batch_size = v_e.size(0)
-        labels = torch.arange(batch_size, device=self.device)
+        labels = torch.arange(batch_size, device=v_e.device)
         loss_t = F.cross_entropy(logits, labels)
         loss_v = F.cross_entropy(logits.T, labels)
 
@@ -97,8 +92,8 @@ class AdapterModule(LightningModule):
         return loss
     
     def on_validation_epoch_end(self):
-        all_videos = torch.cat(self.val_video_embeddings) # [Dim_Dataset, Embed_Dim]
-        all_texts = torch.cat(self.val_text_embeddings)   # [Dim_Dataset, Embed_Dim]
+        all_videos = torch.cat(self.val_video_embeddings)
+        all_texts = torch.cat(self.val_text_embeddings)
 
         sim_matrix = torch.matmul(all_texts, all_videos.T)
 

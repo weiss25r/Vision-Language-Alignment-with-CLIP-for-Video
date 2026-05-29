@@ -83,8 +83,8 @@ class ModelTrainer():
             distilbert_tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
 
             self.module = EpicKitchensFramesModule(
-                csv_file='./data/annotations/processed/train.csv',
-                frames_dir = './data/sampled/train',
+                csv_dir='./data/annotations/processed/',
+                frames_dir = './data/sampled/',
                 tokenizer = distilbert_tokenizer,
                 batch_size=train_config['batch_size'],
                 num_workers=train_config['num_workers'],

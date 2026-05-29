@@ -99,9 +99,9 @@ class EpicKitchensFramesDataset(Dataset):
         }
 
 class EpicKitchensFramesModule(LightningDataModule):
-    def __init__(self, csv_file, frames_dir, tokenizer, batch_size, num_workers):
+    def __init__(self, csv_dir, frames_dir, tokenizer, batch_size, num_workers):
         super().__init__()
-        self.csv_file = csv_file
+        self.csv_dir = csv_dir
         self.frames_dir = frames_dir
         self.tokenizer = tokenizer
         self.batch_size = batch_size
@@ -110,11 +110,11 @@ class EpicKitchensFramesModule(LightningDataModule):
 
     def setup(self, stage=None):
         if stage == 'fit':
-            self.train_dataset = EpicKitchensFramesDataset(self.csv_file, self.frames_dir, self.tokenizer, mode='train')
-            self.val_dataset = EpicKitchensFramesDataset(self.csv_file, self.frames_dir, self.tokenizer, mode='val')
+            self.train_dataset = EpicKitchensFramesDataset(os.path.join(self.csv_dir, 'train.csv'), os.path.join(self.frames_dir, 'train'), self.tokenizer, mode='train')
+            self.val_dataset = EpicKitchensFramesDataset(os.path.join(self.csv_dir, 'val.csv'), os.path.join(self.frames_dir, 'val'), self.tokenizer, mode='val')
         if stage == 'test':
-            self.test_seen_dataset = EpicKitchensFramesDataset(self.csv_file, self.frames_dir, self.tokenizer, mode='val')
-            self.test_zeroshot_dataset = EpicKitchensFramesDataset(self.csv_file, self.frames_dir, self.tokenizer, mode='val')
+            self.test_seen_dataset = EpicKitchensFramesDataset(os.path.join(self.csv_dir, 'test_seen.csv'), os.path.join(self.frames_dir, 'test_seen'), self.tokenizer, mode='val')
+            self.test_zeroshot_dataset = EpicKitchensFramesDataset(os.path.join(self.csv_dir, 'test_zeroshot.csv'), os.path.join(self.frames_dir, 'test_zeroshot'), self.tokenizer, mode='val')
 
     def train_dataloader(self):
         return DataLoader(
@@ -146,24 +146,17 @@ class EpicKitchensFramesModule(LightningDataModule):
 # In src/datasets/dataset.py
 
 class EpicKitchensFeatureDataset(Dataset):
-    def __init__(self, features_path, csv_path):
+    def __init__(self, features_path):
         with open(features_path, 'rb') as f:
             self.features = torch.load(f)
             self.keys = list(self.features.keys())
-        
-        # Carichiamo il CSV e usiamo narration_id come indice per una ricerca istantanea
-        self.df = pd.read_csv(csv_path).set_index('narration_id')
     
     def __len__(self):
         return len(self.keys)
     
     def __getitem__(self, idx):
-        n_id = self.keys[idx]
-        tensor = self.features[n_id]
-        row = self.df.loc[n_id]
-        
-        # Ritorniamo anche le classi (puoi usare 'verb' e 'noun' testuali o gli ID)
-        return tensor['text'], tensor['video'], row['verb_class'], row['noun_class']
+        tensor = self.features[self.keys[idx]]
+        return (tensor['text'], tensor['video'])
     
 class EpicKitchensFeatureModule(LightningDataModule):
     def __init__(self, features_dir, batch_size, num_workers):
@@ -175,8 +168,8 @@ class EpicKitchensFeatureModule(LightningDataModule):
 
     def setup(self, stage=None):
         if stage == 'fit':
-            self.train_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_train.pt'), './data/annotations/processed/train.csv')
-            self.val_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_val.pt'), './data/annotations/processed/val.csv')        
+            self.train_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_train.pt'))
+            self.val_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_val.pt'))        
         if stage == 'test':
             self.test_seen_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_test_seen.pt'))
             self.test_zeroshot_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_test_zeroshot.pt'))

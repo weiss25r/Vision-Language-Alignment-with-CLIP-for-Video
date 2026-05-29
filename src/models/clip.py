@@ -25,14 +25,13 @@ class VideoCLIP(nn.Module):
             torch.ones([]) * np.log(1/ 0.07)
         )
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
-
         self.video_encoder = video_encoder
         self.text_encoder = text_encoder
         self.video_mlp = MLP(**video_mlp_config)
         self.text_mlp = MLP(**text_mlp_config)
 
     def forward(self, video, text_input_ids, text_attention_mask):
+        
         text_output = self.text_encoder(
             text_input_ids=text_input_ids,
             text_attention_mask=text_attention_mask
@@ -44,9 +43,8 @@ class VideoCLIP(nn.Module):
         text_embedding = (sum_embeddings / sum_mask)
 
 
-        with torch.no_grad():
-            video_output = self.video_encoder(video)
-        video_embedding = video_output.last_hidden_state.mean(dim=1) 
+        video_output = self.video_encoder(video)
+        video_embedding = video_output.last_hidden_state[:, 0, :]
 
         video_output = self.video_mlp(video_embedding)
         text_output = self.text_mlp(text_embedding)
@@ -61,7 +59,7 @@ class VideoCLIP(nn.Module):
 
         logits = sim_matrix * temperature
         batch_size = v_e.size(0)
-        labels = torch.arange(batch_size, device=self.device)
+        labels = torch.arange(batch_size, device=v_e.device)
         loss_t = F.cross_entropy(logits, labels)
         loss_v = F.cross_entropy(logits.T, labels)
 
@@ -73,8 +71,11 @@ class VideoCLIPModule(LightningModule):
     def __init__(self, lr, weight_decay, adapter_config):
         super(VideoCLIPModule, self).__init__()
 
-        text_model = DistilBertModel.from_pretrained("distilbert-base-uncased-finetuned-sst-2-english")
+        text_model = DistilBertModel.from_pretrained("distilbert-base-uncased")
         text_model.train()
+
+        # for param in text_model.parameters():
+        #     param.requires_grad = False
 
         text_encoder = TextEncoder(text_model)
 
@@ -105,6 +106,13 @@ class VideoCLIPModule(LightningModule):
         video_output, text_output = self.model(video, text_input_ids, text_attention_mask)
         return video_output, text_output
     
+    def on_train_epoch_start(self):
+        self.model.video_encoder.eval()
+        for name, module in self.model.video_encoder.named_modules():
+            if "layer.11" in name or "layernorm" in name:
+                module.train()
+
+
     def training_step(self, batch, batch_idx):
         text_input_ids = batch['text_input_ids']
         text_attention_mask = batch['text_attention_mask']
