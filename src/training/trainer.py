@@ -15,6 +15,13 @@ from src.models.adapter import AdapterModule
 from src.models.clip import VideoCLIPModule
 from transformers import AutoTokenizer
 
+import transformers
+import tokenizers
+torch.serialization.add_safe_globals([transformers.models.bert.tokenization_bert.BertTokenizer])
+torch.serialization.add_safe_globals([tokenizers.Tokenizer])
+torch.serialization.add_safe_globals([tokenizers.models.Model])
+torch.serialization.add_safe_globals([tokenizers.AddedToken])
+
 class ModelTrainer():
     def __init__(self, config_file_path, model="adapter"):
         with open(config_file_path, 'r') as f:
@@ -61,17 +68,19 @@ class ModelTrainer():
             max_epochs = train_config['max_epochs'],
             logger = self.logger,
             callbacks = callbacks,
-            log_every_n_steps = 50
+            log_every_n_steps = 50,
+            accumulate_grad_batches = 4,
+            precision = "bf16-mixed"
         )
 
         if model == "adapter":
             self.module = EpicKitchensFeatureModule(
-                features_dir='./data/features',
+                features_dir='./data/features/cls',
                 batch_size=train_config['batch_size'],
                 num_workers=train_config['num_workers'],
             )
         elif model == "clip":
-            distilbert_tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased-finetuned-sst-2-english")
+            distilbert_tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
 
             self.module = EpicKitchensFramesModule(
                 csv_file='./data/annotations/processed/train.csv',
@@ -87,6 +96,6 @@ class ModelTrainer():
 
 
 if __name__ == "__main__":
-    trainer = ModelTrainer("experiments/configs/config.yaml", model="clip")
+    trainer = ModelTrainer("experiments/configs/config_full.yaml", model="clip")
     trainer.train()
     # TODO: CLI 

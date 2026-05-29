@@ -7,6 +7,7 @@ from PIL import Image
 import numpy as np
 import pandas as pd
 import os
+import cv2
 
 from torch.utils.data import DataLoader
 
@@ -69,9 +70,11 @@ class EpicKitchensFramesDataset(Dataset):
             
             if not os.path.exists(frame_path):
                 frame_path = os.path.join(video_dir, f"frame_{f_idx:010d}.jpg") 
-                
-            img = Image.open(frame_path).convert('RGB')
-            img_tensor = self.transforms(img)
+            
+            img_bgr = cv2.imread(frame_path)
+
+            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+            img_tensor = self.transforms(img_rgb)
             frames.append(img_tensor)
         
         #video tensor: [T, C, H, W]
@@ -120,7 +123,8 @@ class EpicKitchensFramesModule(LightningDataModule):
             num_workers=self.num_workers,
             shuffle=True,
             persistent_workers=True if self.num_workers > 0 else False,
-            pin_memory=True
+            pin_memory=True,
+            prefetch_factor=2 if self.num_workers > 0 else 0
         )
     
     def val_dataloader(self):
@@ -130,7 +134,8 @@ class EpicKitchensFramesModule(LightningDataModule):
             num_workers=self.num_workers,
             shuffle=False,
             persistent_workers=True if self.num_workers > 0 else False,
-            pin_memory=True
+            pin_memory=True,
+            prefetch_factor=2 if self.num_workers > 0 else 0
         )
 
     def test_dataloader(self):
@@ -138,18 +143,27 @@ class EpicKitchensFramesModule(LightningDataModule):
         dl_zeroshot = DataLoader(self.test_zeroshot_dataset, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=False)
         return [dl_seen, dl_zeroshot]
 
+# In src/datasets/dataset.py
+
 class EpicKitchensFeatureDataset(Dataset):
-    def __init__(self, features_path):
+    def __init__(self, features_path, csv_path):
         with open(features_path, 'rb') as f:
             self.features = torch.load(f)
             self.keys = list(self.features.keys())
+        
+        # Carichiamo il CSV e usiamo narration_id come indice per una ricerca istantanea
+        self.df = pd.read_csv(csv_path).set_index('narration_id')
     
     def __len__(self):
         return len(self.keys)
     
     def __getitem__(self, idx):
-        tensor = self.features[self.keys[idx]]
-        return (tensor['text'], tensor['video'])
+        n_id = self.keys[idx]
+        tensor = self.features[n_id]
+        row = self.df.loc[n_id]
+        
+        # Ritorniamo anche le classi (puoi usare 'verb' e 'noun' testuali o gli ID)
+        return tensor['text'], tensor['video'], row['verb_class'], row['noun_class']
     
 class EpicKitchensFeatureModule(LightningDataModule):
     def __init__(self, features_dir, batch_size, num_workers):
@@ -161,8 +175,8 @@ class EpicKitchensFeatureModule(LightningDataModule):
 
     def setup(self, stage=None):
         if stage == 'fit':
-            self.train_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_train.pt'))
-            self.val_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_val.pt'))        
+            self.train_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_train.pt'), './data/annotations/processed/train.csv')
+            self.val_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_val.pt'), './data/annotations/processed/val.csv')        
         if stage == 'test':
             self.test_seen_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_test_seen.pt'))
             self.test_zeroshot_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_test_zeroshot.pt'))
