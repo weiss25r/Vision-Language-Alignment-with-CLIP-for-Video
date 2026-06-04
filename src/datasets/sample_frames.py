@@ -23,21 +23,10 @@ def extract_required_frames(csv_path, dataset_root_dir, output_root_dir, strateg
     for video_id, group in tqdm(grouped_videos, desc="Processing videos - extracting and sampling frames", unit="video"):
         
         frames_to_extract = set()
-
-        #for training, extract all frames
-        if "train" in csv_path:
-            for _, row in group.iterrows():
-                for f_idx in range(row['start_frame'], row['stop_frame'] + 1):
-                    frames_to_extract.add(f_idx)
-        else:
-            for _, row in group.iterrows():
-                indices = get_uniform_frame_indices(
-                    row['start_frame'], 
-                    row['stop_frame'], 
-                    num_frames=8, 
-                    strategy=strategy
-                )
-                frames_to_extract.update(indices)
+        
+        for _, row in group.iterrows():
+            for f_idx in range(row['start_frame'], row['stop_frame'] + 1):
+                frames_to_extract.add(f_idx)
             
         target_filenames = {f"frame_{idx:010d}.jpg" for idx in frames_to_extract}
         
@@ -65,7 +54,7 @@ if __name__ == "__main__":
     
     OUTPUT_ROOT = "./data/sampled/"
 
-    for s in ["train", 'val', "test_seen", "test_zeroshot"]:
+    for s in ["train",'val',"test_seen", "test_zeroshot"]:
         output_dir = os.path.join(OUTPUT_ROOT, s)
         os.makedirs(output_dir, exist_ok=True)
     

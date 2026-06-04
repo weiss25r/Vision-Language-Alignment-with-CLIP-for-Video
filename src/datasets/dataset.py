@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import os
 import cv2
+import ast
 
 from torch.utils.data import DataLoader
 
@@ -58,9 +59,9 @@ class EpicKitchensFramesDataset(Dataset):
         
         #random for training, center for validation
         if self.mode == 'train':
-            frame_indices = get_uniform_frame_indices(row['start_frame'], row['stop_frame'], strategy='random')
+            frame_indices = get_uniform_frame_indices(row['start_frame'], row['stop_frame'], num_frames=16, strategy='random')
         else:
-            frame_indices = get_uniform_frame_indices(row['start_frame'], row['stop_frame'], strategy='center')
+            frame_indices = get_uniform_frame_indices(row['start_frame'], row['stop_frame'], num_frames=16, strategy='center')
 
         video_dir = os.path.join(self.frames_dir, video_id)
         
@@ -81,6 +82,14 @@ class EpicKitchensFramesDataset(Dataset):
         video_tensor = torch.stack(frames, dim=0) 
         
         text = row['narration']
+
+        if self.tokenizer is None:
+            return {
+                'narration_id': narration_id,
+                'raw_text': text,
+                'video': video_tensor
+            }
+        
         text_inputs = self.tokenizer(
             text, 
             padding='max_length', 

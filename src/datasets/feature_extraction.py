@@ -44,7 +44,7 @@ test_zeroshot = EpicKitchensFramesDataset(
     mode='val'
 )
 
-batch_size = 128
+batch_size = 64
 
 train_loader = torch.utils.data.DataLoader(
     train_dataset,
@@ -106,7 +106,7 @@ with torch.no_grad():
             text_embeddings = (sum_embeddings / sum_mask).cpu()
 
             video_output = video_encoder(video_tensor)
-            video_embeddings = video_output.last_hidden_state.mean(dim=1).cpu() 
+            video_embeddings = video_output.last_hidden_state[:, 0, :].cpu().detach()
             
             for i, n_id in enumerate(narration_ids):
                 dataset_features[n_id] = {
