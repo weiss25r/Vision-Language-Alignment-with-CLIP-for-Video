@@ -7,6 +7,8 @@ from PIL import Image
 import numpy as np
 import pandas as pd
 import os
+import cv2
+import ast
 
 from torch.utils.data import DataLoader
 
@@ -24,8 +26,9 @@ class EpicKitchensFramesDataset(Dataset):
         self.mean = [0.485, 0.456, 0.406]
         self.std = [0.229, 0.224, 0.225]
         
+        self.mode = mode
+
         if mode == 'val':
-            # Transforms for inference mode
             self.transforms = v2.Compose([
                 v2.ToImage(),
                 v2.Resize(224, antialias=True),
@@ -33,10 +36,19 @@ class EpicKitchensFramesDataset(Dataset):
                 v2.ToDtype(torch.float32, scale=True),
                 v2.Normalize(mean=self.mean, std=self.std)
             ])
-
-        #TODO: Add transforms for training
+        elif mode == 'train':
+            self.transforms = v2.Compose([
+                v2.ToImage(),
+                v2.Resize(256, antialias=True),
+                v2.RandomCrop(224),
+                v2.ToDtype(torch.float32, scale=True),
+                v2.Normalize(mean=self.mean, std=self.std)
+            ])
+        else:
+            raise ValueError(f"Invalid mode: {mode}")
 
     def __len__(self):
+        
         return len(self.df)
 
     def __getitem__(self, idx):
@@ -45,7 +57,12 @@ class EpicKitchensFramesDataset(Dataset):
         narration_id = row['narration_id'] 
         video_id = row['video_id']
         
-        frame_indices = get_uniform_frame_indices(row['start_frame'], row['stop_frame'], strategy='center')
+        #random for training, center for validation
+        if self.mode == 'train':
+            frame_indices = get_uniform_frame_indices(row['start_frame'], row['stop_frame'], num_frames=16, strategy='random')
+        else:
+            frame_indices = get_uniform_frame_indices(row['start_frame'], row['stop_frame'], num_frames=16, strategy='center')
+
         video_dir = os.path.join(self.frames_dir, video_id)
         
         frames = []
@@ -54,15 +71,25 @@ class EpicKitchensFramesDataset(Dataset):
             
             if not os.path.exists(frame_path):
                 frame_path = os.path.join(video_dir, f"frame_{f_idx:010d}.jpg") 
-                
-            img = Image.open(frame_path).convert('RGB')
-            img_tensor = self.transforms(img) # [C, H, W]
+            
+            img_bgr = cv2.imread(frame_path)
+
+            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+            img_tensor = self.transforms(img_rgb)
             frames.append(img_tensor)
         
         #video tensor: [T, C, H, W]
         video_tensor = torch.stack(frames, dim=0) 
         
         text = row['narration']
+
+        if self.tokenizer is None:
+            return {
+                'narration_id': narration_id,
+                'raw_text': text,
+                'video': video_tensor
+            }
+        
         text_inputs = self.tokenizer(
             text, 
             padding='max_length', 
@@ -79,7 +106,53 @@ class EpicKitchensFramesDataset(Dataset):
             'text_input_ids': text_inputs['input_ids'],
             'text_attention_mask': text_inputs['attention_mask']
         }
-        
+
+class EpicKitchensFramesModule(LightningDataModule):
+    def __init__(self, csv_dir, frames_dir, tokenizer, batch_size, num_workers):
+        super().__init__()
+        self.csv_dir = csv_dir
+        self.frames_dir = frames_dir
+        self.tokenizer = tokenizer
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.save_hyperparameters()
+
+    def setup(self, stage=None):
+        if stage == 'fit':
+            self.train_dataset = EpicKitchensFramesDataset(os.path.join(self.csv_dir, 'train.csv'), os.path.join(self.frames_dir, 'train'), self.tokenizer, mode='train')
+            self.val_dataset = EpicKitchensFramesDataset(os.path.join(self.csv_dir, 'val.csv'), os.path.join(self.frames_dir, 'val'), self.tokenizer, mode='val')
+        if stage == 'test':
+            self.test_seen_dataset = EpicKitchensFramesDataset(os.path.join(self.csv_dir, 'test_seen.csv'), os.path.join(self.frames_dir, 'test_seen'), self.tokenizer, mode='val')
+            self.test_zeroshot_dataset = EpicKitchensFramesDataset(os.path.join(self.csv_dir, 'test_zeroshot.csv'), os.path.join(self.frames_dir, 'test_zeroshot'), self.tokenizer, mode='val')
+
+    def train_dataloader(self):
+        return DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=True,
+            persistent_workers=True if self.num_workers > 0 else False,
+            pin_memory=True,
+            prefetch_factor=2 if self.num_workers > 0 else 0
+        )
+    
+    def val_dataloader(self):
+        return DataLoader(
+            self.val_dataset,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=False,
+            persistent_workers=True if self.num_workers > 0 else False,
+            pin_memory=True,
+            prefetch_factor=2 if self.num_workers > 0 else 0
+        )
+
+    def test_dataloader(self):
+        dl_seen = DataLoader(self.test_seen_dataset, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=False)
+        dl_zeroshot = DataLoader(self.test_zeroshot_dataset, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=False)
+        return [dl_seen, dl_zeroshot]
+
+# In src/datasets/dataset.py
 
 class EpicKitchensFeatureDataset(Dataset):
     def __init__(self, features_path):

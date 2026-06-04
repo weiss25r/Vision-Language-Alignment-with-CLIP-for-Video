@@ -15,3 +15,5 @@ experiments/checkpoints/
 
 .DS_Store
 /notebooks/lightning_logs
+EgoVLP-main
+pretrained
