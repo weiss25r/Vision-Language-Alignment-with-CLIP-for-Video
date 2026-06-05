@@ -155,33 +155,42 @@ class EpicKitchensFramesModule(LightningDataModule):
 # In src/datasets/dataset.py
 
 class EpicKitchensFeatureDataset(Dataset):
-    def __init__(self, features_path):
+    def __init__(self, features_path, csv_path=None):
         with open(features_path, 'rb') as f:
             self.features = torch.load(f)
             self.keys = list(self.features.keys())
+
+        if csv_path is not None:
+            self.df = pd.read_csv(csv_path, index_col="narration_id")
     
     def __len__(self):
         return len(self.keys)
     
     def __getitem__(self, idx):
         tensor = self.features[self.keys[idx]]
-        return (tensor['text'], tensor['video'])
+
+
+        verb = self.df.loc[self.keys[idx]]['verb_class']
+        noun = self.df.loc[self.keys[idx]]['noun_class']
+
+        return (tensor['text'], tensor['video'], verb, noun)
     
 class EpicKitchensFeatureModule(LightningDataModule):
-    def __init__(self, features_dir, batch_size, num_workers):
+    def __init__(self, features_dir, csv_dir, batch_size, num_workers):
         super().__init__()
         self.features_dir = features_dir
         self.batch_size = batch_size
         self.num_workers = num_workers
+        self.csv_dir = csv_dir
         self.save_hyperparameters()
 
     def setup(self, stage=None):
         if stage == 'fit':
-            self.train_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_train.pt'))
-            self.val_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_val.pt'))        
+            self.train_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_train.pt'), os.path.join(self.csv_dir, 'train.csv'))
+            self.val_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_val.pt'), os.path.join(self.csv_dir, 'val.csv'))        
         if stage == 'test':
-            self.test_seen_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_test_seen.pt'))
-            self.test_zeroshot_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_test_zeroshot.pt'))
+            self.test_seen_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_test_seen.pt'), os.path.join(self.csv_dir, 'test_seen.csv'))
+            self.test_zeroshot_dataset = EpicKitchensFeatureDataset(os.path.join(self.features_dir, 'features_test_zeroshot.pt'), os.path.join(self.csv_dir, 'test_zeroshot.csv'))
 
     def train_dataloader(self):
         return DataLoader(
