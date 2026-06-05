@@ -75,7 +75,7 @@ class ModelTrainer():
 
         if model == "adapter":
             self.module = EpicKitchensFeatureModule(
-                features_dir='./data/features/cls',
+                features_dir='./data/features/egovlp_plus/',
                 batch_size=train_config['batch_size'],
                 num_workers=train_config['num_workers'],
             )
@@ -94,8 +94,11 @@ class ModelTrainer():
     def train(self):
         self.trainer.fit(self.model, datamodule=self.module)
 
+    def test(self):
+        self.module.setup('test')
+        self.trainer.test(self.model, datamodule=self.module)
 
 if __name__ == "__main__":
-    trainer = ModelTrainer("experiments/configs/config_full.yaml", model="clip")
+    trainer = ModelTrainer("experiments/configs/config.yaml", model="adapter")
     trainer.train()
-    # TODO: CLI 
+    trainer.test()

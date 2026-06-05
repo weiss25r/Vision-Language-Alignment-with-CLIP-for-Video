@@ -16,11 +16,11 @@ class MLP(nn.Module):
         super(MLP, self).__init__()
 
         self.net = nn.Sequential(
-            nn.Linear(in_dim, hidden_dim),
-            nn.LayerNorm(hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, out_dim)
+            nn.Linear(in_dim, out_dim),
+            # nn.LayerNorm(hidden_dim),
+            # nn.ReLU(),
+            # nn.Dropout(dropout),
+            # nn.Linear(hidden_dim, out_dim)
         )
 
     def forward(self, x):
@@ -65,6 +65,10 @@ class AdapterModule(LightningModule):
         self.val_video_embeddings = []
         self.val_text_embeddings = []
         self.save_hyperparameters()
+        self.test_video_embeddings_seen = []
+        self.test_text_embeddings_seen = []
+        self.test_video_embeddings_zeroshot = []
+        self.test_text_embeddings_zeroshot = []
 
     def forward(self, video_input, text_input):
         video_output, text_output = self.model(video_input, text_input)
@@ -103,9 +107,38 @@ class AdapterModule(LightningModule):
         self.val_video_embeddings.clear()
         self.val_text_embeddings.clear()
     
-    def test_step(self, *args, **kwargs):
-        #define seen and zero-shot
-        pass
+    def test_step(self, batch, batch_idx, dataloader_idx):
+        text, video, = batch
+        video_output, text_output = self.model(video, text)
+        
+        if dataloader_idx == 0:
+            self.test_video_embeddings_seen.append(video_output.detach().cpu())
+            self.test_text_embeddings_seen.append(text_output.detach().cpu())
+        elif dataloader_idx == 1:
+            self.test_video_embeddings_zeroshot.append(video_output.detach().cpu())
+            self.test_text_embeddings_zeroshot.append(text_output.detach().cpu())
+    
+    def on_test_epoch_end(self):
+        all_videos_seen = F.normalize(torch.cat(self.test_video_embeddings_seen), dim=1)
+        all_texts_seen = F.normalize(torch.cat(self.test_text_embeddings_seen), dim = 1)
+
+        all_videos_zeroshot = F.normalize(torch.cat(self.test_video_embeddings_zeroshot), dim=1)
+        all_texts_zeroshot = F.normalize(torch.cat(self.test_text_embeddings_zeroshot), dim=1)
+
+        sim_matrix_seen = torch.matmul(all_texts_seen, all_videos_seen.T)
+        sim_matrix_zeroshot = torch.matmul(all_texts_zeroshot, all_videos_zeroshot.T)
+
+
+        recalls_seen = compute_recall(sim_matrix_seen, len(all_videos_seen), "test-seen/")
+        recalls_zeroshot = compute_recall(sim_matrix_zeroshot, len(all_videos_zeroshot), "test-zeroshot/")
+
+        self.log_dict(recalls_seen, on_step=False, on_epoch=True, prog_bar=True)
+        self.log_dict(recalls_zeroshot, on_step=False, on_epoch=True, prog_bar=True)
+
+        self.test_video_embeddings_seen.clear()
+        self.test_text_embeddings_seen.clear()
+        self.test_video_embeddings_zeroshot.clear()
+        self.test_text_embeddings_zeroshot.clear()
     
     def configure_optimizers(self):
         optimizer = AdamW(self.parameters(), lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
