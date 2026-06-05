@@ -85,7 +85,7 @@ class Adapter(nn.Module):
         return (loss_v2t + loss_t2v) / 2
 
 class AdapterModule(LightningModule):
-    def __init__(self, lr, weight_decay, adapter_config):
+    def __init__(self, lr, weight_decay, adapter_config, loss="egonce"):
         super(AdapterModule, self).__init__()
         self.model = Adapter(adapter_config["video_mlp"], adapter_config["text_mlp"])
 
@@ -109,25 +109,39 @@ class AdapterModule(LightningModule):
     def training_step(self, batch, batch_idx):
         text, video, verb, noun = batch
         video_output, text_output = self.model(video, text)
-        loss = self.model.egonce_loss(
-            video_output,
-            text_output,
-            verb,
-            noun,
-            temperature=0.05
-        )
+
+        if self.hparams.loss == "egonce":
+            loss = self.model.egonce_loss(
+                video_output,
+                text_output,
+                verb,
+                noun,
+                temperature=0.05
+            )
+        elif self.hparams.loss == "clip":
+            loss, _ = self.model.get_clip_loss(video_output, text_output)
+        else:
+            raise ValueError(f"Invalid loss: {self.hparams.loss}")
+
         self.log('train/loss', loss)
         return loss
     
     def validation_step(self, batch, batch_idx):
         text, video, verb, noun = batch
         video_output, text_output = self.model(video, text)
-        loss = self.model.egonce_loss(
-            video_output,
-            text_output,
-            verb,
-            noun
-        )
+
+        if self.hparams.loss == "egonce":
+            loss = self.model.egonce_loss(
+                video_output,
+                text_output,
+                verb,
+                noun
+            )
+        elif self.hparams.loss == "clip":
+            loss, _ = self.model.get_clip_loss(video_output, text_output)
+        else:
+            raise ValueError(f"Invalid loss: {self.hparams.loss}")
+
         self.log('val/loss', loss, on_step=False, on_epoch=True)
 
         with torch.no_grad():
