@@ -28,18 +28,41 @@ class ModelTrainer():
             config = yaml.safe_load(f)
 
         train_config = config['train_config']
-        if model == "adapter":
+
+        model_name = config['model_config']['model']
+
+        if model_name == "adapter":
             self.model = AdapterModule(
                 lr=train_config['learning_rate'],
                 weight_decay=train_config['weight_decay'],
-                adapter_config=config['model_config']
+                adapter_config=config['model_config'],
+                loss=train_config['loss']
             )
-        elif model == "clip":
+
+            self.module = EpicKitchensFeatureModule(
+                csv_dir=train_config['csv_dir'],
+                features_dir=train_config['feature_dir'],
+                batch_size=train_config['batch_size'],
+                num_workers=train_config['num_workers'],
+            )
+
+        elif model_name == "clip":
             self.model = VideoCLIPModule(
                 lr=train_config['learning_rate'],
                 weight_decay=train_config['weight_decay'],
                 adapter_config=config['model_config']
             )
+
+            distilbert_tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
+
+            self.module = EpicKitchensFramesModule(
+                csv_dir=train_config['csv_dir'],
+                frames_dir = train_config['frames_dir'],
+                tokenizer = distilbert_tokenizer,
+                batch_size=train_config['batch_size'],
+                num_workers=train_config['num_workers'],
+            )
+
         else:
             raise ValueError(f"Unknown model: {model}")
 
@@ -69,28 +92,10 @@ class ModelTrainer():
             logger = self.logger,
             callbacks = callbacks,
             log_every_n_steps = 50,
-            accumulate_grad_batches = 4,
+            accumulate_grad_batches = train_config['batch_acc'],
             precision = "bf16-mixed",
-            profiler = "simple",
         )
 
-        if model == "adapter":
-            self.module = EpicKitchensFeatureModule(
-                csv_dir='./data/annotations/processed/',
-                features_dir='./data/features/egovlp_plus/',
-                batch_size=train_config['batch_size'],
-                num_workers=train_config['num_workers'],
-            )
-        elif model == "clip":
-            distilbert_tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
-
-            self.module = EpicKitchensFramesModule(
-                csv_dir='./data/annotations/processed/',
-                frames_dir = './data/sampled/',
-                tokenizer = distilbert_tokenizer,
-                batch_size=train_config['batch_size'],
-                num_workers=train_config['num_workers'],
-            )
         self.module.setup('fit')
         
     def train(self):
@@ -101,6 +106,6 @@ class ModelTrainer():
         self.trainer.test(self.model, datamodule=self.module)
 
 if __name__ == "__main__":
-    trainer = ModelTrainer("experiments/configs/config.yaml", model="adapter")
+    trainer = ModelTrainer("experiments/configs/config.yaml")
     trainer.train()
     trainer.test()

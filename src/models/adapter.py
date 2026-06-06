@@ -23,7 +23,7 @@ class MLP(nn.Module):
         return self.net(x)
 
 class Adapter(nn.Module):
-    def __init__(self, video_mlp_config, text_mlp_config):
+    def __init__(self, video_mlp_config, text_mlp_config, loss="egonce"):
         super(Adapter, self).__init__()
         self.log_t = nn.Parameter(
             torch.zeros([])
@@ -31,16 +31,26 @@ class Adapter(nn.Module):
 
         self.video_mlp = MLP(**video_mlp_config)
         self.text_mlp = MLP(**text_mlp_config)
-        
+        self.loss = loss
 
     def forward(self, video_input, text_input):
         video_output = self.video_mlp(video_input)
         text_output = self.text_mlp(text_input)
         return video_output, text_output
     
-    def get_clip_loss(self, video, text):
-        v_e = F.normalize(video, dim=1)
-        t_e = F.normalize(text, dim=1)
+
+    def get_loss(self, **kwargs):
+        if self.loss == "egonce":
+            return self.egonce_loss(**kwargs)
+        elif self.loss == "clip":
+            return self.get_clip_loss(**kwargs)
+        else:
+            raise ValueError(f"Invalid loss: {self.loss}")
+
+
+    def get_clip_loss(self, video_features, text_features, **kwargs):
+        v_e = F.normalize(video_features, dim=1)
+        t_e = F.normalize(text_features, dim=1)
         sim_matrix = torch.matmul(t_e, v_e.T)
 
         temperature = self.log_t.exp().clamp(max=100.0)
@@ -56,7 +66,7 @@ class Adapter(nn.Module):
         return loss, sim_matrix
     
 
-    def egonce_loss(self, video_features, text_features, verb_classes, noun_classes, temperature=0.05):
+    def egonce_loss(self, video_features, text_features, verb_classes, noun_classes, temperature=0.05, **kwargs):
         video_features = F.normalize(video_features, dim=1)
         text_features = F.normalize(text_features, dim=1)
         
@@ -87,7 +97,7 @@ class Adapter(nn.Module):
 class AdapterModule(LightningModule):
     def __init__(self, lr, weight_decay, adapter_config, loss="egonce"):
         super(AdapterModule, self).__init__()
-        self.model = Adapter(adapter_config["video_mlp"], adapter_config["text_mlp"])
+        self.model = Adapter(adapter_config["video_mlp"], adapter_config["text_mlp"], loss)
 
         self.save_hyperparameters()
 
@@ -110,19 +120,13 @@ class AdapterModule(LightningModule):
         text, video, verb, noun = batch
         video_output, text_output = self.model(video, text)
 
-        if self.hparams.loss == "egonce":
-            loss = self.model.egonce_loss(
-                video_output,
-                text_output,
-                verb,
-                noun,
-                temperature=0.05
-            )
-        elif self.hparams.loss == "clip":
-            loss, _ = self.model.get_clip_loss(video_output, text_output)
-        else:
-            raise ValueError(f"Invalid loss: {self.hparams.loss}")
-
+        loss = self.model.get_loss(
+            video_features=video_output,
+            text_features=text_output,
+            verb_classes=verb,
+            noun_classes=noun,
+            temperature=0.05
+        )
         self.log('train/loss', loss)
         return loss
     
@@ -130,18 +134,13 @@ class AdapterModule(LightningModule):
         text, video, verb, noun = batch
         video_output, text_output = self.model(video, text)
 
-        if self.hparams.loss == "egonce":
-            loss = self.model.egonce_loss(
-                video_output,
-                text_output,
-                verb,
-                noun
-            )
-        elif self.hparams.loss == "clip":
-            loss, _ = self.model.get_clip_loss(video_output, text_output)
-        else:
-            raise ValueError(f"Invalid loss: {self.hparams.loss}")
-
+        loss = self.model.get_loss(
+            video_features=video_output,
+            text_features=text_output,
+            verb_classes=verb,
+            noun_classes=noun,
+            temperature=0.05
+        )
         self.log('val/loss', loss, on_step=False, on_epoch=True)
 
         with torch.no_grad():
@@ -180,8 +179,6 @@ class AdapterModule(LightningModule):
         t_e = F.normalize(text_output, dim=1).detach().cpu()
 
         if dataloader_idx == 0:
-
-            
             self.test_video_embeddings_seen.append(v_e)
             self.test_text_embeddings_seen.append(t_e)
 
@@ -224,9 +221,6 @@ class AdapterModule(LightningModule):
             all_nouns_zeroshot,
             "test-zeroshot/"
         )
-
-        #recalls_seen = compute_recall(sim_matrix_seen, len(all_videos_seen), "test-seen/")
-        #recalls_zeroshot = compute_recall(sim_matrix_zeroshot, len(all_videos_zeroshot), "test-zeroshot/")
 
         self.log_dict(recalls_seen, on_step=False, on_epoch=True, prog_bar=True)
         self.log_dict(recalls_zeroshot, on_step=False, on_epoch=True, prog_bar=True)
