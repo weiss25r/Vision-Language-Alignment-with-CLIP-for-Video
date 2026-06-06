@@ -70,11 +70,13 @@ class ModelTrainer():
             callbacks = callbacks,
             log_every_n_steps = 50,
             accumulate_grad_batches = 4,
-            precision = "bf16-mixed"
+            precision = "bf16-mixed",
+            profiler = "simple",
         )
 
         if model == "adapter":
             self.module = EpicKitchensFeatureModule(
+                csv_dir='./data/annotations/processed/',
                 features_dir='./data/features/egovlp_plus/',
                 batch_size=train_config['batch_size'],
                 num_workers=train_config['num_workers'],
