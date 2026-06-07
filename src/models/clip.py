@@ -12,7 +12,7 @@ from src.models.encoders import VideoEncoder, TextEncoder
 from transformers import DistilBertModel, TimesformerModel
 
 from lightning.pytorch import LightningModule
-from ..evaluation.metrics import compute_recall
+from ..evaluation.metrics import compute_recall, compute_multi_instance_recall
 
 from torch.optim import AdamW
 
@@ -21,6 +21,7 @@ from transformers import get_cosine_schedule_with_warmup
 class VideoCLIP(nn.Module):
     def __init__(self, text_encoder, video_encoder, video_mlp_config, text_mlp_config):
         super(VideoCLIP, self).__init__()
+
         self.log_t = nn.Parameter(
             torch.ones([]) * np.log(1/ 0.07)
         )
@@ -73,10 +74,6 @@ class VideoCLIPModule(LightningModule):
 
         text_model = DistilBertModel.from_pretrained("distilbert-base-uncased")
         text_model.train()
-
-        # for param in text_model.parameters():
-        #     param.requires_grad = False
-
         text_encoder = TextEncoder(text_model)
 
         video_model = TimesformerModel.from_pretrained("facebook/timesformer-base-finetuned-k600")
@@ -85,33 +82,42 @@ class VideoCLIPModule(LightningModule):
 
         for param in video_encoder.parameters():
             param.requires_grad = False
+
+        layers_to_unfreeze = ["layer.11."]
+        final_layernorm = {"layernorm.weight", "layernorm.bias"}
         
-        layers_to_unfreeze = ["layer.11.", "layernorm"]
         for name, param in video_encoder.named_parameters():
-            if any(target in name for target in layers_to_unfreeze):
+            if any(target in name for target in layers_to_unfreeze) or name in final_layernorm:
                 param.requires_grad = True
-        
+
         self.model = VideoCLIP(
             text_encoder,
             video_encoder,
-            adapter_config["video_mlp"], 
-            adapter_config["text_mlp"])
-        
-        self.val_video_embeddings = []
-        self.val_text_embeddings = []
+            adapter_config["video_mlp"],
+            adapter_config["text_mlp"]
+        )
+
+        self.verb_classes_seen = []
+        self.noun_classes_seen = []
+        self.verb_classes_zeroshot = []
+        self.noun_classes_zeroshot = []
+
+        self.test_video_embeddings_seen = []
+        self.test_text_embeddings_seen = []
+        self.test_video_embeddings_zeroshot = []
+        self.test_text_embeddings_zeroshot = []
 
         self.save_hyperparameters()
 
     def forward(self, video, text_input_ids, text_attention_mask):
         video_output, text_output = self.model(video, text_input_ids, text_attention_mask)
         return video_output, text_output
-    
+
     def on_train_epoch_start(self):
         self.model.video_encoder.eval()
         for name, module in self.model.video_encoder.named_modules():
-            if "layer.11" in name or "layernorm" in name:
+            if "layer.11" in name or name == "layernorm":
                 module.train()
-
 
     def training_step(self, batch, batch_idx):
         text_input_ids = batch['text_input_ids']
@@ -122,64 +128,117 @@ class VideoCLIPModule(LightningModule):
         loss, _ = self.model.get_clip_loss(video_output, text_output)
         self.log('train/loss', loss)
         return loss
-    
-    def validation_step(self, batch, batch_idx):
 
+    def validation_step(self, batch, batch_idx):
         text_input_ids = batch['text_input_ids']
         text_attention_mask = batch['text_attention_mask']
         video_tensor = batch['video']
+        verb = batch['verb']
+        noun = batch['noun']
 
         video_output, text_output = self.model(video_tensor, text_input_ids, text_attention_mask)
-    
         loss, _ = self.model.get_clip_loss(video_output, text_output)
-        self.log('val/loss', loss,on_step=False, on_epoch=True)
-        
+        self.log('val/loss', loss, on_step=False, on_epoch=True)
+
         with torch.no_grad():
             v_e = F.normalize(video_output, dim=1).detach().cpu()
             t_e = F.normalize(text_output, dim=1).detach().cpu()
-            
-            self.val_video_embeddings.append(v_e)
-            self.val_text_embeddings.append(t_e)
-            
+
+            self.test_video_embeddings_seen.append(v_e)
+            self.test_text_embeddings_seen.append(t_e)
+            self.verb_classes_seen.append(verb.cpu())
+            self.noun_classes_seen.append(noun.cpu())
+
         return loss
-    
+
     def on_validation_epoch_end(self):
-        all_videos = torch.cat(self.val_video_embeddings)
-        all_texts = torch.cat(self.val_text_embeddings)
+        all_videos = torch.cat(self.test_video_embeddings_seen)
+        all_texts = torch.cat(self.test_text_embeddings_seen)
+        all_verbs = torch.cat(self.verb_classes_seen)
+        all_nouns = torch.cat(self.noun_classes_seen)
 
         sim_matrix = torch.matmul(all_texts, all_videos.T)
-
-        recalls = compute_recall(sim_matrix, len(all_videos), "val/")
+        recalls = compute_multi_instance_recall(sim_matrix, all_verbs, all_nouns, "val/")
         self.log_dict(recalls, on_step=False, on_epoch=True)
 
-        self.val_video_embeddings.clear()
-        self.val_text_embeddings.clear()
-    def test_step(self, *args, **kwargs):
-        #define seen and zero-shot
-        pass
-    
-    def configure_optimizers(self):
+        self.test_video_embeddings_seen.clear()
+        self.test_text_embeddings_seen.clear()
+        self.verb_classes_seen.clear()
+        self.noun_classes_seen.clear()
 
+    def test_step(self, batch, batch_idx, dataloader_idx):
+        text_input_ids = batch['text_input_ids']
+        text_attention_mask = batch['text_attention_mask']
+        video_tensor = batch['video']
+        verb = batch['verb']
+        noun = batch['noun']
+
+        video_output, text_output = self.model(video_tensor, text_input_ids, text_attention_mask)
+
+        v_e = F.normalize(video_output, dim=1).detach().cpu()
+        t_e = F.normalize(text_output, dim=1).detach().cpu()
+
+        if dataloader_idx == 0:
+            self.test_video_embeddings_seen.append(v_e)
+            self.test_text_embeddings_seen.append(t_e)
+            self.verb_classes_seen.append(verb.cpu())
+            self.noun_classes_seen.append(noun.cpu())
+        elif dataloader_idx == 1:
+            self.test_video_embeddings_zeroshot.append(v_e)
+            self.test_text_embeddings_zeroshot.append(t_e)
+            self.verb_classes_zeroshot.append(verb.cpu())
+            self.noun_classes_zeroshot.append(noun.cpu())
+
+    def on_test_epoch_end(self):
+        all_videos_seen = torch.cat(self.test_video_embeddings_seen)
+        all_texts_seen = torch.cat(self.test_text_embeddings_seen)
+        all_videos_zeroshot = torch.cat(self.test_video_embeddings_zeroshot)
+        all_texts_zeroshot = torch.cat(self.test_text_embeddings_zeroshot)
+
+        all_verbs_seen = torch.cat(self.verb_classes_seen)
+        all_nouns_seen = torch.cat(self.noun_classes_seen)
+        all_verbs_zeroshot = torch.cat(self.verb_classes_zeroshot)
+        all_nouns_zeroshot = torch.cat(self.noun_classes_zeroshot)
+
+        sim_matrix_seen = torch.matmul(all_texts_seen, all_videos_seen.T)
+        sim_matrix_zeroshot = torch.matmul(all_texts_zeroshot, all_videos_zeroshot.T)
+
+        recalls_seen = compute_multi_instance_recall(
+            sim_matrix_seen, all_verbs_seen, all_nouns_seen, "test-seen/"
+        )
+        recalls_zeroshot = compute_multi_instance_recall(
+            sim_matrix_zeroshot, all_verbs_zeroshot, all_nouns_zeroshot, "test-zeroshot/"
+        )
+
+        self.log_dict(recalls_seen, on_step=False, on_epoch=True, prog_bar=True)
+        self.log_dict(recalls_zeroshot, on_step=False, on_epoch=True, prog_bar=True)
+
+        self.test_video_embeddings_seen.clear()
+        self.test_text_embeddings_seen.clear()
+        self.test_video_embeddings_zeroshot.clear()
+        self.test_text_embeddings_zeroshot.clear()
+        self.verb_classes_seen.clear()
+        self.noun_classes_seen.clear()
+        self.verb_classes_zeroshot.clear()
+        self.noun_classes_zeroshot.clear()
+
+    def configure_optimizers(self):
         fast_params = (
             list(self.model.text_encoder.parameters()) +
             list(self.model.video_mlp.parameters()) +
             list(self.model.text_mlp.parameters())
         )
-
         slow_params = [p for p in self.model.video_encoder.parameters() if p.requires_grad]
-        
-        lr_text = self.hparams.lr
-        lr_video = self.hparams.lr * 0.1
 
         optimizer = AdamW(
             [
-                {'params': fast_params, 'lr': lr_text},
-                {'params': slow_params, 'lr': lr_video}
+                {'params': fast_params, 'lr': self.hparams.lr},
+                {'params': slow_params, 'lr': self.hparams.lr * 0.1}
             ],
             weight_decay=self.hparams.weight_decay
         )
+
         total_steps = self.trainer.estimated_stepping_batches
-        
         warmup_steps = int(total_steps * 0.1)
 
         scheduler = get_cosine_schedule_with_warmup(
