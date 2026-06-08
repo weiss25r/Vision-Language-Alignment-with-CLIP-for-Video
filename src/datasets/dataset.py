@@ -104,7 +104,9 @@ class EpicKitchensFramesDataset(Dataset):
             'narration_id': narration_id,
             'video': video_tensor,
             'text_input_ids': text_inputs['input_ids'],
-            'text_attention_mask': text_inputs['attention_mask']
+            'text_attention_mask': text_inputs['attention_mask'],
+            'verb': row['verb_class'],
+            'noun': row['noun_class']
         }
 
 class EpicKitchensFramesModule(LightningDataModule):
