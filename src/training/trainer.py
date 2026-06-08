@@ -2,6 +2,7 @@ import torch
 import yaml
 import sys
 import os
+import argparse
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 if project_root not in sys.path:
@@ -23,7 +24,7 @@ torch.serialization.add_safe_globals([tokenizers.models.Model])
 torch.serialization.add_safe_globals([tokenizers.AddedToken])
 
 class ModelTrainer():
-    def __init__(self, config_file_path, model="adapter"):
+    def __init__(self, config_file_path):
         with open(config_file_path, 'r') as f:
             config = yaml.safe_load(f)
 
@@ -64,7 +65,7 @@ class ModelTrainer():
             )
 
         else:
-            raise ValueError(f"Unknown model: {model}")
+            raise ValueError(f"Unknown model: {model_name}")
 
         logging_config = config['logging_config']
 
@@ -98,14 +99,27 @@ class ModelTrainer():
 
         self.module.setup('fit')
         
-    def train(self):
-        self.trainer.fit(self.model, datamodule=self.module)
+    def train(self, ckpt_path=None):
+        self.trainer.fit(self.model, datamodule=self.module, ckpt_path=ckpt_path)
 
-    def test(self):
+    def test(self, ckpt_path=None):
         self.module.setup('test')
-        self.trainer.test(self.model, datamodule=self.module)
+        self.trainer.test(self.model, datamodule=self.module, ckpt_path=ckpt_path)
 
 if __name__ == "__main__":
-    trainer = ModelTrainer("experiments/configs/config.yaml")
-    trainer.train()
-    trainer.test()
+
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    parser.add_argument('--config', type=str, help='path to config file')
+    parser.add_argument('--test', action='store_true', help='only test mode')
+    parser.add_argument('--ckpt', action=str, default=None, help='restore weights from checkpoint')
+
+    user_args = parser.parse_args()
+
+    trainer = ModelTrainer(user_args.config)
+    
+    if user_args.test:
+        trainer.test(user_args.ckpt)
+    else:
+        trainer.train(user_args.ckpt)
