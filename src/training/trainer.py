@@ -97,14 +97,17 @@ class ModelTrainer():
             precision = "bf16-mixed",
         )
 
-        self.module.setup('fit')
-        
     def train(self, ckpt_path=None):
+        self.module.setup('fit')
         self.trainer.fit(self.model, datamodule=self.module, ckpt_path=ckpt_path)
 
     def test(self, ckpt_path=None):
         self.module.setup('test')
         self.trainer.test(self.model, datamodule=self.module, ckpt_path=ckpt_path)
+
+    def validate(self, ckpt_path=None):
+        self.module.setup('fit')
+        self.trainer.validate(self.model, datamodule=self.module, ckpt_path=ckpt_path)
 
 if __name__ == "__main__":
 
