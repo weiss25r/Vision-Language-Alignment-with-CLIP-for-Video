@@ -81,9 +81,11 @@ class ModelTrainer():
             ModelCheckpoint(
                 dirpath = logging_config['checkpoint_dir'],
                 monitor='val/loss',
-                filename = logging_config['exp_name']+'{epoch}-{val/loss:.2f}',
+                filename = logging_config['exp_name']+'_best',
                 mode='min', 
-                save_last=True
+                save_top_k=1,
+                save_last=True,
+                enable_version_counter=False
             )
         ]
 
