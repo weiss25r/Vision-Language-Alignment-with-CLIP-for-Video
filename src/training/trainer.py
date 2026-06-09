@@ -116,7 +116,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--config', type=str, help='path to config file')
     parser.add_argument('--test', action='store_true', help='only test mode')
-    parser.add_argument('--ckpt', action=str, default=None, help='restore weights from checkpoint')
+    parser.add_argument('--ckpt', type=str, default=None, help='restore weights from checkpoint')
 
     user_args = parser.parse_args()
 
