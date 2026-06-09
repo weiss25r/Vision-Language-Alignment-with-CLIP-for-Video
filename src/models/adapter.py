@@ -63,7 +63,7 @@ class Adapter(nn.Module):
 
         loss = (loss_t + loss_v) /2
 
-        return loss, sim_matrix
+        return loss
     
 
     def egonce_loss(self, video_features, text_features, verb_classes, noun_classes, temperature=0.05, **kwargs):
