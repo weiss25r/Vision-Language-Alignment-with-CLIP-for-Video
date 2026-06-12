@@ -4,6 +4,7 @@ import sys
 import os
 import argparse
 
+
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -15,7 +16,7 @@ from src.datasets.dataset import EpicKitchensFeatureModule, EpicKitchensFramesMo
 from src.models.adapter import AdapterModule
 from src.models.clip import VideoCLIPModule
 from transformers import AutoTokenizer
-
+from pytorch_lightning import seed_everything
 import transformers
 import tokenizers
 torch.serialization.add_safe_globals([transformers.models.bert.tokenization_bert.BertTokenizer])
@@ -23,10 +24,14 @@ torch.serialization.add_safe_globals([tokenizers.Tokenizer])
 torch.serialization.add_safe_globals([tokenizers.models.Model])
 torch.serialization.add_safe_globals([tokenizers.AddedToken])
 
+
+
 class ModelTrainer():
     def __init__(self, config_file_path):
         with open(config_file_path, 'r') as f:
             config = yaml.safe_load(f)
+
+        seed_everything(config['seed'], workers=True)
 
         train_config = config['train_config']
 
@@ -37,7 +42,8 @@ class ModelTrainer():
                 lr=train_config['learning_rate'],
                 weight_decay=train_config['weight_decay'],
                 adapter_config=config['model_config'],
-                loss=train_config['loss']
+                loss=train_config['loss'],
+                egonce_temperature=train_config['egonce_temperature']
             )
 
             self.module = EpicKitchensFeatureModule(
@@ -81,11 +87,9 @@ class ModelTrainer():
             ModelCheckpoint(
                 dirpath = logging_config['checkpoint_dir'],
                 monitor='val/loss',
-                filename = logging_config['exp_name']+'_best',
+                filename = logging_config['exp_name']+'{epoch}-{val/loss:.2f}',
                 mode='min', 
-                save_top_k=1,
-                save_last=True,
-                enable_version_counter=False
+                save_last=True
             )
         ]
 
@@ -99,17 +103,14 @@ class ModelTrainer():
             precision = "bf16-mixed",
         )
 
-    def train(self, ckpt_path=None):
         self.module.setup('fit')
+        
+    def train(self, ckpt_path=None):
         self.trainer.fit(self.model, datamodule=self.module, ckpt_path=ckpt_path)
 
     def test(self, ckpt_path=None):
         self.module.setup('test')
         self.trainer.test(self.model, datamodule=self.module, ckpt_path=ckpt_path)
-
-    def validate(self, ckpt_path=None):
-        self.module.setup('fit')
-        self.trainer.validate(self.model, datamodule=self.module, ckpt_path=ckpt_path)
 
 if __name__ == "__main__":
 

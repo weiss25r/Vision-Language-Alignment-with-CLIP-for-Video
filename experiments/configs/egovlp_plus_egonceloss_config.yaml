@@ -12,7 +12,6 @@ train_config:
   frames_dir: ./data/sampled/
   batch_acc: 4
   egonce_temperature: 0.05 #set 0 to use learnable temperature for egonce loss
-  
 
 model_config:
   model: adapter
@@ -28,7 +27,9 @@ model_config:
     dropout: 0.1
 
 logging_config:
-  project_name: "FinalMLP"
+  project_name: "MLP42"
   exp_name: "egovlp_plus_egonceloss_features"
   log_dir: "experiments/logs/egovlp_egonceloss/"
   checkpoint_dir: "experiments/checkpoints/egovlp_egonceloss/"
+
+seed: 42

@@ -27,7 +27,7 @@ model_config:
     dropout: 0.1
 
 logging_config:
-  project_name: "FinalMLP"
+  project_name: "MLP42"
   exp_name: "Timesformer_features_linear"
   log_dir: "experiments/logs/timesformer/"
   checkpoint_dir: "experiments/checkpoints/timesformer/"

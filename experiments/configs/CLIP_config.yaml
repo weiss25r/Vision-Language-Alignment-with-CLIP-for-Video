@@ -27,7 +27,7 @@ model_config:
     dropout: 0.1
 
 logging_config:
-  project_name: "FinalMLP"
+  project_name: "MLP42"
   exp_name: "CLIP_features"
   log_dir: "experiments/logs/clip/"
   checkpoint_dir: "experiments/checkpoints/clip/"

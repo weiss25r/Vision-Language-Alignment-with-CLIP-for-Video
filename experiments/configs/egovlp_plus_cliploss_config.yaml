@@ -27,7 +27,7 @@ model_config:
     dropout: 0.1
 
 logging_config:
-  project_name: "FinalMLP"
+  project_name: "MLP42"
   exp_name: "egovlp_plus_cliploss_features"
   log_dir: "experiments/logs/egovlp_cliploss/"
   checkpoint_dir: "experiments/checkpoints/egovlp_cliploss/"
