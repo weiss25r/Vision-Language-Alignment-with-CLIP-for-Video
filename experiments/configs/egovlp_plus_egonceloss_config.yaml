@@ -1,0 +1,35 @@
+train_config:
+  learning_rate: 0.0001
+  weight_decay: 0.01
+  max_epochs: 1000
+  batch_size: 512
+  num_workers: 4
+  accelerator: gpu
+  patience: 10
+  loss: egonce
+  feature_dir: ./data/features/egovlp_plus/
+  csv_dir: ./data/annotations/processed/
+  frames_dir: ./data/sampled/
+  batch_acc: 4
+  egonce_temperature: 0.05 #set 0 to use learnable temperature for egonce loss
+
+model_config:
+  model: adapter
+  text_mlp:
+    in_dim: 256
+    hidden_dim: 512
+    out_dim: 256
+    dropout: 0.1
+  video_mlp:
+    in_dim: 256
+    hidden_dim: 512
+    out_dim: 256
+    dropout: 0.1
+
+logging_config:
+  project_name: "MLP42"
+  exp_name: "egovlp_plus_egonceloss_features"
+  log_dir: "experiments/logs/egovlp_egonceloss/"
+  checkpoint_dir: "experiments/checkpoints/egovlp_egonceloss/"
+
+seed: 42

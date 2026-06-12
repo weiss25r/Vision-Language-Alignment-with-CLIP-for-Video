@@ -15,9 +15,19 @@ class MLP(nn.Module):
     def __init__(self, in_dim, hidden_dim, out_dim, dropout=0.1):
         super(MLP, self).__init__()
 
-        self.net = nn.Sequential(
-            nn.Linear(in_dim, hidden_dim),
-        )
+        if hidden_dim is None or hidden_dim == 0:
+            self.net = nn.Sequential(
+                nn.Linear(in_dim, out_dim),
+            )
+        else:
+            self.net = nn.Sequential(
+                nn.Linear(in_dim, hidden_dim),
+                nn.LayerNorm(hidden_dim),
+                nn.ReLU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim, out_dim)
+            )
+
 
     def forward(self, x):
         return self.net(x)
@@ -25,17 +35,34 @@ class MLP(nn.Module):
 class Adapter(nn.Module):
     def __init__(self, video_mlp_config, text_mlp_config, loss="egonce"):
         super(Adapter, self).__init__()
-        self.log_t = nn.Parameter(
-            torch.zeros([])
-        )
+
+        if loss == "clip":
+            self.log_t = nn.Parameter(
+                torch.ones([]) * np.log(1/ 0.07)
+            )
+        elif loss == "egonce":
+            self.egonce_temperature = nn.Parameter(
+                torch.ones([]) * np.log(1/ 0.05)
+            )
+        else:
+            raise ValueError(f"Invalid loss: {loss}")
 
         self.video_mlp = MLP(**video_mlp_config)
         self.text_mlp = MLP(**text_mlp_config)
         self.loss = loss
 
     def forward(self, video_input, text_input):
-        video_output = self.video_mlp(video_input)
-        text_output = self.text_mlp(text_input)
+
+        if video_input is None:
+            video_output = None
+        else:
+            video_output = self.video_mlp(video_input)
+
+        if text_input is None:
+            text_output = None
+        else:
+            text_output = self.text_mlp(text_input)
+
         return video_output, text_output
     
 
@@ -63,17 +90,26 @@ class Adapter(nn.Module):
 
         loss = (loss_t + loss_v) /2
 
-        return loss, sim_matrix
+        return loss
     
 
-    def egonce_loss(self, video_features, text_features, verb_classes, noun_classes, temperature=0.05, **kwargs):
+    def egonce_loss(self, video_features, text_features, verb_classes, noun_classes, temperature=None, **kwargs):
         video_features = F.normalize(video_features, dim=1)
         text_features = F.normalize(text_features, dim=1)
         
         device = video_features.device
 
-        sim_matrix_v2t = torch.matmul(video_features, text_features.T) / temperature
-        sim_matrix_t2v = torch.matmul(text_features, video_features.T) / temperature
+        sim_matrix_v2t = torch.matmul(video_features, text_features.T)
+        sim_matrix_t2v = torch.matmul(text_features, video_features.T)
+
+        if temperature is None or temperature == 0:
+            exp_t = self.egonce_temperature.exp().clamp(max=100.0)
+
+            sim_matrix_v2t = sim_matrix_v2t * exp_t
+            sim_matrix_t2v = sim_matrix_t2v * exp_t
+        else:
+            sim_matrix_v2t = sim_matrix_v2t / temperature
+            sim_matrix_t2v = sim_matrix_t2v / temperature
         
         verb_mask = (verb_classes.unsqueeze(0) == verb_classes.unsqueeze(1))
         noun_mask = (noun_classes.unsqueeze(0) == noun_classes.unsqueeze(1))
@@ -95,7 +131,7 @@ class Adapter(nn.Module):
         return (loss_v2t + loss_t2v) / 2
 
 class AdapterModule(LightningModule):
-    def __init__(self, lr, weight_decay, adapter_config, loss="egonce"):
+    def __init__(self, lr, weight_decay, adapter_config, loss="egonce", egonce_temperature=0.05):
         super(AdapterModule, self).__init__()
         self.model = Adapter(adapter_config["video_mlp"], adapter_config["text_mlp"], loss)
 
@@ -125,7 +161,7 @@ class AdapterModule(LightningModule):
             text_features=text_output,
             verb_classes=verb,
             noun_classes=noun,
-            temperature=0.05
+            temperature=self.hparams.egonce_temperature
         )
         self.log('train/loss', loss)
         return loss
