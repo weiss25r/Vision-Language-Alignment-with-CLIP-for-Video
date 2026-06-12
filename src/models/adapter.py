@@ -15,9 +15,19 @@ class MLP(nn.Module):
     def __init__(self, in_dim, hidden_dim, out_dim, dropout=0.1):
         super(MLP, self).__init__()
 
-        self.net = nn.Sequential(
-            nn.Linear(in_dim, hidden_dim),
-        )
+        if hidden_dim is None or hidden_dim == 0:
+            self.net = nn.Sequential(
+                nn.Linear(in_dim, out_dim),
+            )
+        else:
+            self.net = nn.Sequential(
+                nn.Linear(in_dim, hidden_dim),
+                nn.LayerNorm(hidden_dim),
+                nn.ReLU(),
+                nn.Dropout(dropout),
+                nn.Linear(hidden_dim, out_dim)
+            )
+
 
     def forward(self, x):
         return self.net(x)
@@ -34,8 +44,17 @@ class Adapter(nn.Module):
         self.loss = loss
 
     def forward(self, video_input, text_input):
-        video_output = self.video_mlp(video_input)
-        text_output = self.text_mlp(text_input)
+
+        if video_input is None:
+            video_output = None
+        else:
+            video_output = self.video_mlp(video_input)
+
+        if text_input is None:
+            text_output = None
+        else:
+            text_output = self.text_mlp(text_input)
+
         return video_output, text_output
     
 
@@ -63,7 +82,7 @@ class Adapter(nn.Module):
 
         loss = (loss_t + loss_v) /2
 
-        return loss
+        return loss, sim_matrix
     
 
     def egonce_loss(self, video_features, text_features, verb_classes, noun_classes, temperature=0.05, **kwargs):
