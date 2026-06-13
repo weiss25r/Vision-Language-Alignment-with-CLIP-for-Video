@@ -1,8 +1,3 @@
-> **NOTE: This file is the official template for the technical README of your repository.**  
-> Before starting, make sure you have carefully read the **[INSTRUCTIONS.md](INSTRUCTIONS.md)**.  
-> This file must contain **exclusively the technical aspects** of the project (Setup, Run, baseline Results). The textual and theoretical report should be placed in the **[`docs/REPORT.md`](docs/REPORT.md)** file.
-> *Delete this note block before submission.*
-
 # Vision-Language-Alignment-with-CLIP-for-Video
 
 [![Report](https://img.shields.io/badge/Paper-REPORT.md-blue)](docs/REPORT.md)
@@ -11,48 +6,55 @@
 ## 👥 Group and Project Information
 - **Group ID**: Justgood AI 
 - **Project ID**: 15
+- **Group Members**: Edoardo Tantari, Raffaele Terracino
 
 ## 📝 Project Description
-Searching for videos traditionally relies on manually curated metadata rather than visual content. This project explores zero-shot cross-modal retrieval by aligning video features with natural language text using a contrastive loss model reminiscent of CLIP.*
+Searching for videos traditionally relies on manually curated metadata rather than visual content. This project explores zero-shot cross-modal retrieval by aligning video features with natural language text using a contrastive loss model reminiscent of CLIP.
+
+Project done as part of the course [**Deep Learning - Advanced Models and Methods**](https://antoninofurnari.github.io/deeplearning/) at University of Catania.
 
 > 📖 **Official Report**: For all theoretical details, performance analysis, the architecture used, and group contributions, please refer to our formal paper: **[REPORT.md](docs/REPORT.md)**.
 
 ## 🛠 Technical Reproducibility
 
-### 1. Data and Environment Setup
+### 1. Environment and data Setup
 
 **Prerequisites:**
-Explain how the reader can install the environment to run your code.
+To get started, clone the repo and install required libraries using pip:
 
 ```bash
-git clone https://github.com/yourusername/your-repo.git
-cd your-repo
+pip install requirements.txt
+```
+
+or by using conda:
+
+```bash
 conda env create -f environment.yml
-conda activate dl-project
+conda activate vla
 ```
 
 **Dataset:**
-Explain in 2 lines where to download the data from and in which folder it needs to reside (e.g., `data/raw/`).
+to replicate the entire pipeline, you'll need to download the [Epic Kitchens dataset](LINK). If you want to only replicate baseline and best model training, you can just download our extracted features from [here](link).
 
-### 2. Network Training
-Provide the **exact commands** to start the training.
+### 2. Training
+You can start training using the following commands.
 
-**Baseline Training:**
 ```bash
-python -m src.training.train --config experiments/configs/baseline.yaml
+python src/training/trainer.py --config experiments/configs/experiment.yaml
 ```
+You can also resume training from a checkpoint using ```--ckpt``` and specifying the checkpoint path.
+For each experiment, we provided both the "last" checkpoint, correspondind to the last epoch, and the "best" one, corresponding to the lowest validation loss. 
 
-**Improved Model Training:**
-```bash
-python -m src.training.train --config experiments/configs/model_v1.yaml
-```
-
+Use file ```MLP_timesformer_config.yaml``` for **baseline training** and ```egovlp_egonceloss_config.yaml``` for **best model training.**
 ### 3. Evaluation
-Provide the commands to reproduce the numbers in your summary table.
+You can test trained models using the following command:
 
 ```bash
-python -m src.evaluation.evaluate --config experiments/configs/model_v1.yaml
+python src/evaluation/evaluate.py --config experiments/configs/experiment.yaml --ckpt <path_to_checkpoint> --test
 ```
+
+To run inference on the validation set, you can use the ```--validate``` flag.
+For each experiment a checkpoint is provided, the one corresponding to the lowest validation loss.
 
 ---
 
