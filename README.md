@@ -1,61 +1,92 @@
-# Vision-Language-Alignment-with-CLIP-for-Video
+# Vision-Language Alignment with CLIP for Video
 
 [![Report](https://img.shields.io/badge/Paper-REPORT.md-blue)](docs/REPORT.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## 👥 Group and Project Information
-- **Group ID**: Justgood AI 
-- **Project ID**: 15
-- **Group Members**: Edoardo Tantari, Raffaele Terracino
+
+| | |
+|---|---|
+| **Group** | Justgood AI |
+| **Project ID** | 15 |
+| **Members** | Edoardo Tantari, Raffaele Terracino |
 
 ## 📝 Project Description
+
 Searching for videos traditionally relies on manually curated metadata rather than visual content. This project explores zero-shot cross-modal retrieval by aligning video features with natural language text using a contrastive loss model reminiscent of CLIP.
 
-Project done as part of the course [**Deep Learning - Advanced Models and Methods**](https://antoninofurnari.github.io/deeplearning/) at University of Catania.
+Project done as part of the course [**Deep Learning — Advanced Models and Methods**](https://antoninofurnari.github.io/deeplearning/) at University of Catania.
 
-> 📖 **Official Report**: For all theoretical details, performance analysis, the architecture used, and group contributions, please refer to our formal paper: **[REPORT.md](docs/REPORT.md)**.
+> 📖 **Official Report**: For theoretical details, performance analysis, architecture, and group contributions, see **[REPORT.md](docs/REPORT.md)**.
 
-## 🛠 Technical Reproducibility
+---
 
-### 1. Environment and data Setup
+## 🛠 Tecnical Reproducibility
 
-**Prerequisites:**
-To get started, clone the repo and install required libraries using pip:
+### 1. Clone the repository
 
 ```bash
-pip install requirements.txt
+git clone https://github.com/<your-username>/vision-language-alignment.git
+cd vision-language-alignment
 ```
 
-or by using conda:
+### 2. Create the conda environment
 
 ```bash
 conda env create -f environment.yml
 conda activate vla
 ```
 
-**Dataset:**
-to replicate the entire pipeline, you'll need to download the [Epic Kitchens dataset](LINK). If you want to only replicate baseline and best model training, you can just download our extracted features from [here](link).
+### 3. Install PyTorch
 
-### 2. Training
-You can start training using the following commands.
+PyTorch is **not** included in `environment.yml` to keep the environment hardware-agnostic. Install it manually based on your hardware. We used `torch 2.11.0`. 
+
+---
+
+##  Data Setup
+
+To replicate the full pipeline, download the [Epic Kitchens dataset](https://academictorrents.com/details/c92b4a3cd3834e9af9666ac82379ff15ca289a83).
+
+If you only want to replicate baseline and best model training, download our pre-extracted features [here](https://github.com/weiss25r/Vision-Language-Alignment-with-CLIP-for-Video/releases/download/v1.0.0/Pre-extracted.features.zip) 
+— no need to process the raw dataset.
+
+---
+
+##  Training
+
+Start training with:
 
 ```bash
 python src/training/trainer.py --config experiments/configs/experiment.yaml
 ```
-You can also resume training from a checkpoint using ```--ckpt``` and specifying the checkpoint path.
-For each experiment, we provided both the "last" checkpoint, correspondind to the last epoch, and the "best" one, corresponding to the lowest validation loss. 
 
-Use file ```MLP_timesformer_config.yaml``` for **baseline training** and ```egovlp_egonceloss_config.yaml``` for **best model training.**
-### 3. Evaluation
-You can test trained models using the following command:
+Resume from a checkpoint with `--ckpt <path_to_checkpoint>`.
+
+Six config files are provided:
+
+| Config | Description |
+|---|---|
+| `MLP_timesformer_config.yaml` | Baseline training |
+| `linear_timesformer_config.yaml` | Best model training |
+| `full_fine_tuning_config.yaml` | Best model training |
+| `CLIP_config.yaml` | Best model training |
+| `egovlp_plus_cliploss_config.yaml` | Best model training |
+| `egovlp_egonceloss_config.yaml` | Best model training |
+
+Each experiment produces two checkpoints: `last` (final epoch) and `best` (lowest validation loss).
+
+---
+
+## Evaluation
+
+Evaluate a trained model on the test set:
 
 ```bash
 python src/evaluation/evaluate.py --config experiments/configs/experiment.yaml --ckpt <path_to_checkpoint> --test
 ```
 
-To run inference on the validation set, you can use the ```--validate``` flag.
-For each experiment a checkpoint is provided, the one corresponding to the lowest validation loss.
+Run inference on the validation set with `--validate` instead of `--test`.
 
 ---
 
-*For the declaration of individual tasks and the use of AI, refer to `docs/REPORT.md`.*
+*For the declaration of individual tasks and use of AI tools, refer to [`docs/REPORT.md`](docs/REPORT.md).*
