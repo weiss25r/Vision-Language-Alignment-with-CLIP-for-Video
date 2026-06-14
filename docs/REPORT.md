@@ -20,33 +20,18 @@ To validate our model capabilites on entirely unseen verbs and nouns, we split o
 
 ## Statistics
 The following table resume statistics for each set.
-| Split | Number of samples | Distinct verbs | Distinct nouns |
-|---|---:|---:|---:|
-| Training set | 29619 | 91 | 270 |
-| Validation set | 5802 | 78 | 172 |
-| Test seen set | 8648 | 77 | 206 |
-| Test zero-shot set | 1020 | 38 | 94 |
+| Split | Number of samples | 
+|---|---:|
+| Training set | 29619 |
+| Validation set | 5802 | 
+| Test seen set | 8648 |
+| Test zero-shot set | 1020 | 
 
 ## 4. Methodology and Architecture
 *Detail the experiments and how your system is built. What architecture did you use as a baseline? How did you modify it? Describe the network topology, key layers, the loss function used, and the training logic.*
 
 ### Baseline architecture
-For our baseline, we choose [TimeSformer](paper) as video encoder and [DistilBERT](paper) as text encoder. The choice is motivated by the necessity of having a powerful video encoder, which translates into a time-consuming architecture, and a text encoder capable of correctly captures the semantic of narrations while not consuming too much time and energy. Since both encoders are frozen in the baseline, we perform offline feature extraction on sets to speed up training. For DistilBERT we take the mean pooling of the last layer for each narration, while for TimeSformer we directly use the [CLS] token. This is done automatically in script ```src/dataset/features_extraction.py```, in which we use the default "distilbarte-base-uncased" model and "timesformer-base-finetuned-k600", both included within the HuggingFace transformers library. On top of Timesformer and DistilBERT features, we train an adapter consisting of two indipendent MLP with one hidden layer. The adapter's pourpose is to align the text embedding space with the video one. The structure is one typical of MLPs: hidden layer, layer normalization, dropout, output layer. The adapter is trained using a contrastive loss exactly as implemented in [CLIP paper](paper). Hyperparameters for the baseline are provided
-
-### Experiments
-To improve our baseline, we perform the following experiments:
-- Fine-tuning DistilBERT and the last layer of TimeSformer. In this setting, we use a simple adapter consisting of a single linear layer to avoid losing pre-training information. TimeSformer' learning rate is set as $1/10$ of DistilBERT one. During training, 
-- Changing frozen encoders: we try to change the input features mantaining the same Adapter layout. We first switch to original CLIP, using its text encoder and image encoder. To perform video encoding, we take the mean pooling of encoded frames. We then try using EgoVLP+ encoders, fine-tuned on EPIC-Kitchens
-- Coerently with the choice of trying EgoVLP+ features, we switch from the standard CLIP loss to a similar EgoVLP loss using action-positive sampling: TOOD SPIEGARE.
-
-Hyperparameters for each experiments are provided in the experiments/configs folder. Results are commented in the next section.
-
-### Sanity checks on features
-To start each experiment concerning features, we perform two sanity checks before training:
-- a zero-shot evaluation, where we evaluate Recall@K without the Adapter module
-- training of a logistic classifier on verbs
-
-Sanity checks allow us to answer the question "how good are the input features?" prior to training and are performed on validation set.
+For our baseline, we choose [TimeSformer](paper) as video encoder and [DistilBERT](paper) as text encoder. The choice is motivated by the necessity of having a powerful video encoder, which translates into a time-consuming architecture, and a text encoder capable of correctly captures the semantic of narrations while not consuming too much time and energy. Since both encoders are frozen in the baseline, we perform offline feature extraction on sets to speed up training. For DistilBERT we take the mean pooling of the last layer for each narration. This is motivated by the absence of the Next-Sentence prediction task in DistilBERT pre-training. To extract features with TimeSformer base, which works at a temporal resolution of 8 frames, we divide each clip into 8 bins and choose the central frame as its representative. To extract the final embedding we directly use the [CLS] token. This is done automatically in script ```src/dataset/features_extraction.py```, in which we use the default "distilbarte-base-uncased" model and "timesformer-base-finetuned-k600", both included within the HuggingFace transformers library. On top of Timesformer and DistilBERT features, we train an adapter consisting of two indipendent MLP with one hidden layer. The adapter's pourpose is to align the text embedding space with the video one. The structure is one typical of MLPs: hidden layer, layer normalization, dropout, output layer. The adapter is trained using a contrastive loss exactly as implemented in [CLIP paper](paper). As in CLIP, temperature is a learnable parameter inizialized as $log(1/0.07)$. Hyperparameters for the baseline are provided in ```experiments/configs/MLP_timesformer_config.yaml```.
 
 ### Evaluation metrics
 To perform model selection and evaluate our models, we compute Multi-Instance Recall. Standard Recall@K assumes a single relevant item per query in the gallery, which is unrealistic in EPIC-KITCHENS where multiple clips can depict the same action. We therefore adopt **Multi-Instance Recall@K**, which considers a query successful if at least one of the top-K retrieved items is semantically equivalent to it.
@@ -59,7 +44,55 @@ The metric is then computed as:
 
 $$\text{MIR@K} = \frac{1}{N} \sum_{i=1}^{N} \mathbf{1}\left[\exists\, j \in \text{top-K}(i) : \text{match}(i,j) = 1\right]$$
 
-The model with the highest MIR@1 on the validation set is finally evaluated on the test set, concluding the experimental phase.
+### Experiments
+To improve our baseline, we perform a series of experiments.
+Seed is set at 42 for all experiments for reproducibility.
+Hyperparameters for each experiments are provided in the experiments/configs folder. The model with the highest MIR@1 on the validation set is finally evaluated on the test set, concluding the experimental phase.
+#### Fine-tuning
+
+DistilBERT and the last layer of TimeSformer. In this setting, we use a simple adapter consisting of a single linear layer to avoid losing pre-training information. TimeSformer' learning rate is set as $1/10$ of DistilBERT one. During training, we perform temporal data augmentation. Since Timesformer works with videos of 16 frames, we divide each clip into 16 bins and randomly select a frame as representant for each bin.
+
+#### Changing frozen encoders
+We try to change the input features mantaining the same Adapter layout. We first switch to original CLIP, using its text encoder and image encoder. To perform video encoding, we take the mean pooling of encoded frames. We then try using EgoVLP+ encoders, fine-tuned on EPIC-Kitchens. 
+To start each experiment concerning features, we perform two sanity checks before training:
+- a zero-shot evaluation, where we evaluate Recall@K without the Adapter module
+- training of a logistic classifier on verbs
+
+Sanity checks allow us to answer the question "how good are the input features?" prior to training and are performed on validation set.
+
+#### Changing the loss
+Coherently with the choice of trying EgoVLP+ features, we switch from the standard CLIP los to a contrastive loss inspired by EgoNCE (Lin et al., 2022), simplified to use only
+action-aware positive sampling, without the scene-aware negative sampling of the original work.
+
+The standard CLIP loss (InfoNCE) treats each video-text pair as the unique positive for the
+other, and all other samples in the batch as negatives:
+
+$$\mathcal{L}^{\text{CLIP}}_{v2t} = -\frac{1}{N} \sum_{i=1}^{N} \log \frac{\exp(\mathbf{v}_i^T \mathbf{t}_i / \tau)}{\sum_{j=1}^{N} \exp(\mathbf{v}_i^T \mathbf{t}_j / \tau)}$$
+
+This is problematic in egocentric datasets like EPIC-KITCHENS-100, where multiple clips
+can depict the same action (e.g., several videos of *"put down the knife"*). Treating
+semantically equivalent samples as negatives produces a noisy and misleading training signal.
+
+Following EgoNCE, we define a positive set $\mathcal{P}_i$ for each sample $i$ as all
+samples in the batch that share the same verb class **and** the same noun class:
+
+$$\mathcal{P}_i = \{j \in \mathcal{B} \mid \text{verb}(j) = \text{verb}(i) \;\wedge\; \text{noun}(j) = \text{noun}(i)\}$$
+
+This resembles our definition of MIR@K.
+The loss then places probability mass on the entire positive set rather than a single pair:
+
+$$\mathcal{L}^{\text{ego}}_{v2t} = -\frac{1}{N} \sum_{i=1}^{N} \log \frac{\sum_{k \in \mathcal{P}_i} \exp(\mathbf{v}_i^T \mathbf{t}_k / \tau)}{\sum_{j=1}^{N} \exp(\mathbf{v}_i^T \mathbf{t}_j / \tau)}$$
+
+The full loss is the average of the symmetric video-to-text and text-to-video terms:
+
+$$\mathcal{L}^{\text{ego}} = \frac{1}{2}\left(\mathcal{L}^{\text{ego}}_{v2t} + \mathcal{L}^{\text{ego}}_{t2v}\right)$$
+
+where $\mathbf{v}_i$ and $\mathbf{t}_i$ are L2-normalized video and text embeddings, and
+$\tau$ is a learnable temperature parameter initialized to $1/0.05$.
+
+
+
+
 
 ## 5. Results and Discussion
 Insert here the quantitative tables with the achieved results and compare your solution with the baseline. **Do not limit yourself to pasting numbers**, but comment on them:
@@ -76,20 +109,55 @@ We report quantitative results for each experiment, including sanity checks on f
 | CLIP | 28 | 5.5 | 20.9 | 31.2 |
 | EgoVLP fine-tuned features | 77 | 52.6 | 79.2 | 85.8 |
 
-The effect of pre-extracted features is clear. Using baseline' features, it is clear that Timesformer cannot produce a good representation of the egocentric setting of EPIC-KITCHENS, as the logistic regressor cannot produce a good boundary between classes. The same happens with mean-pooled CLIP features. However, using the latest, there is a clear gap in zero-shot retrieval performance, with an increase of +27.6% in R@10. This is explainable by the fact that, while CLIP, as it it a model for text-image retrieval, cannot model motion as TimeSformer, but it is capable of producing good text representation that allows retrieval. On the other hand, EgoVLP+, fine-tuned on EPIC-KITCHENS 100 for the Multi-Instance Retrieval task, produces the best features so far, capable of high-performance zero-shot retrival as well as being good for classification on verbs. 
+The effect of pre-extracted features is clear. Using baseline' features, it is clear that Timesformer cannot produce a good representation of the egocentric setting of EPIC-KITCHENS, as the logistic regressor cannot produce a good boundary between classes. The same happens with mean-pooled CLIP features. However, using the latest, there is a clear gap in zero-shot retrieval performance, with an increase of +27.6% in R@10. This is explainable by the fact that, while CLIP, as it it a model for text-image retrieval, cannot model motion as TimeSformer, it is capable of producing good text representation that allows retrieval. On the other hand, EgoVLP+, fine-tuned on EPIC-KITCHENS 100 for the Multi-Instance Retrieval task, produces the best features so far, capable of high-performance zero-shot retrival as well as being good for classification on verbs. 
 
 ### R@K on Validation set
 The following tables shows metrics computed on validation set for each trained model, highlightning the best one.
 Experiment | R@1 | R@5 | R@10 |
 | --- | --- | --- | --- |
 | Baseline | 26.4 | 57.7 | 66.1 |
-| Fine tuning last layer TSF + DistilBERT | 25.4 | 54.6 | 66.1 |
+| Fine tuning | 25.4 | 54.6 | 66.1 |
 | CLIP features | 21.0 | 44.3 | 55.0 |
 | EgoVLP+ CLIP loss | 64.7 | 84.6 | 89.6 |
 | **EgoVLP+ egonce loss** | **68.9** | **84.1** | **88.2** |
 
-### Analysis
-Fine tuning TimeSformer' last layer and full fine tuning DistilBERT seem to destroy the encoder capabilites, as metrics are very similar. Furthermore, training this architecture is highly time-consuming, as it takes almost 10 minutes per epoch using our machine. This experiment led us to abandon completely fine-tuning approaches. CLIP features - as opposed to their good sanity checks - performs clearly worst than our baseline. Our intuition is that while CLIP's text encoder provided good representations for our narrations, the absence of motion-modeling capabilites of the mean-pooling is a clear bottleneck. Our adapter then destroys extracted features.
+### Comments
+Fine tuning TimeSformer' last layer and full fine tuning DistilBERT seem to destroy the encoders capabilites, as metrics are very similar to the baseline. Furthermore, training this architecture is highly time-consuming, as it takes approximately 12 minutes per epoch using our machine. This experiment led us to abandon completely fine-tuning approaches. CLIP features - as opposed to their good sanity checks - performs clearly worst than our baseline. Our intuition is that while CLIP's text encoder provided good representations for our narrations, as demostrated by the sanity check, video embeddings are not representative and as such are easily destroyed by the adatper. On the other hand, EgoVLP+ demostrates the power of its pre-training on Ego4D and fine-tuning on EPIC KITCHENS as it produce very good features for both classification and zero-shot retrieval. Because the features are good enough, the adapter refines their geometry and obtain a +40% increase in R@1. Nuova loss spiegazione
+
+
+### Test sets result for best traine model
+#### Test Seen
+
+| Metric | DataLoader 0 |
+| --- | ---: |
+| R@1 | 52.39 |
+| R@5 | 70.28 |
+| R@10 | 76.34 |
+
+#### Test Zero-shot
+
+| Metric | DataLoader 0 |
+| --- | ---: |
+| R@1 | 49.61 |
+| R@5 | 73.24 |
+| R@10 | 81.18 |
+
+
+### Qualitative results
+--- Esempi di errori R@1 (max 10) ---
+          Query (GT)      Predetta (top-1)  Sim coseno
+          take paper    move cooking paper      0.6457
+          take onion             take skin      0.6451
+         wipe cooker         clean kitchen      0.7037
+      put down cloth         hang up cloth      0.7137
+      throw onion in        throw eggs box      0.5152
+          hand cloth         squeeze cloth      0.6189
+throw paper into bin             throw bag      0.6137
+           take hand pick up ball of dough      0.5322
+  throw can into bin    put rubbish in bin      0.6179
+            take bin       throw away bits      0.5928
+
+
 
 ## 6. Conclusion and Limitations
 *Summarize the project's outcome. What are the current limitations (e.g., requires too much memory, fails in low-light conditions)? If you had more time, what future experiments would you run?*
@@ -98,9 +166,8 @@ Fine tuning TimeSformer' last layer and full fine tuning DistilBERT seem to dest
 
 ### 7.1 Contribution Breakdown
 *Detail clearly who did what within the group.*
-- **Person 1**: ...
-- **Person 2**: ...
-- **Person 3**: ...
+- **Edoardo Tantari**: Offline feature extraction process, Experiments training, boh
+- **Raffaele Terracino**: Architecture definitions boh 
 
 ### 7.2 Use of Artificial Intelligence
 *Declare here the possible use of tools like Copilot or ChatGPT, specifying in which phases they helped you (e.g., writing boilerplate, debugging, documentation), keeping in mind that the architectural design and the responsibility for the result are yours.*
