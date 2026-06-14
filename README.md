@@ -45,7 +45,7 @@ PyTorch is **not** included in `environment.yml` to keep the environment hardwar
 
 ##  Data Setup
 
-To replicate the full pipeline, download the [Epic Kitchens dataset](https://academictorrents.com/details/c92b4a3cd3834e9af9666ac82379ff15ca289a83).
+To replicate the full pipeline, download the [Epic Kitchens dataset](https://academictorrents.com/details/c92b4a3cd3834e9af9666ac82379ff15ca289a83) and follow the "Data" section of the technical report.
 
 If you only want to replicate baseline and best model training, download our pre-extracted features [here](https://github.com/weiss25r/Vision-Language-Alignment-with-CLIP-for-Video/releases/download/v1.0.0/Pre-extracted.features.zip) 
 — no need to process the raw dataset.
@@ -70,7 +70,7 @@ Five config files are provided, one for each experiment described in the technic
 | `full_fine_tuning_config.yaml` | Encoders fine-tuning |
 | `CLIP_config.yaml` | CLIP features + adapter |
 | `egovlp_plus_cliploss_config.yaml` | EgoVLP+ fine-tuned + adapter |
-| `egovlp_egonceloss_config.yaml` | EgoVLP+ and EgoNCE loss + adapter|
+| `egovlp_egonceloss_config.yaml` | EgoVLP+ and EgoNCE loss + adapter (best model)|
 
 Each experiment produces two checkpoints: `last` (final epoch) and `best` (lowest validation loss).
 

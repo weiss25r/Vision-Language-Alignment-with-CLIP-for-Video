@@ -61,7 +61,7 @@ $$\text{MIR@K} = \frac{1}{N} \sum_{i=1}^{N} \mathbf{1}\left[\exists\, j \in \tex
 To improve our baseline, we perform a series of experiments. The seed is set to 42 for all experiments for reproducibility. Hyperparameters for each experiment are provided in the `experiments/configs` folder. The model with the highest MIR@1 on the validation set is finally evaluated on the test set, concluding the experimental phase.
 
 #### Fine-tuning
-DistilBERT and the last layer of TimeSformer. In this setting, we use a simple adapter consisting of a single linear layer to avoid losing pre-training information. TimeSformer's learning rate is set as $1/10$ of DistilBERT's. During training, we perform temporal data augmentation. Since Timesformer works with videos of 16 frames, we divide each clip into 16 bins and randomly select a frame as a representative for each bin.
+In this setting, we fine-tune DistilBERT and the last layer of TimeSformer on EPIC KITCHENS. In this setting, we use a simple adapter consisting of a single linear layer to avoid losing pre-training information. TimeSformer's learning rate is set as $1/10$ of DistilBERT's. During training, we perform temporal data augmentation. Since Timesformer works with videos of 8 frames, we divide each clip into 8 bins and randomly select a frame as a representative for each bin.
 
 #### Changing frozen encoders
 We try to change the input features while maintaining the same Adapter layout. We first switch to original CLIP, using its text encoder and image encoder. To perform video encoding, we take the mean pooling of the encoded frames. We then try using EgoVLP+ encoders, fine-tuned on EPIC-Kitchens. 
@@ -73,7 +73,7 @@ To start each experiment concerning features, we perform two sanity checks befor
 Sanity checks allow us to answer the question "how good are the input features?" prior to training and are performed on the validation set.
 
 #### Changing the loss
-Coherently with the choice of trying EgoVLP+ features, we switch from the standard CLIP loss to a contrastive loss inspired by EgoNCE (Lin et al., 2022), simplified to use only action-aware positive sampling, without the scene-aware negative sampling of the original work.
+Coherently with the choice of trying EgoVLP+ features, we switch from the standard CLIP loss to a contrastive loss inspired by EgoNCE, simplified to use only action-aware positive sampling, without the scene-aware negative sampling of the original work.
 
 The standard CLIP loss (InfoNCE) treats each video-text pair as the unique positive for the other, and all other samples in the batch as negatives:
 
@@ -97,11 +97,6 @@ where $\mathbf{v}_i$ and $\mathbf{t}_i$ are L2-normalized video and text embeddi
 
 
 ## 5. Results and Discussion
-*Insert here the quantitative tables with the achieved results and compare your solution with the baseline. Do not limit yourself to pasting numbers, but comment on them:
-- Why does model A perform better than model B?
-- Are there classes where the model is particularly weak?
-- Show qualitative examples (e.g., inserting correctly vs. incorrectly predicted images).*
-
 We report quantitative results for each experiment, including sanity checks on features and evaluation metrics of trained models.
 
 ### Sanity Checks on input video features 
@@ -111,7 +106,7 @@ We report quantitative results for each experiment, including sanity checks on f
 | CLIP | 28 | 5.5 | 20.9 | 31.2 |
 | EgoVLP fine-tuned features | 77 | 52.6 | 79.2 | 85.8 |
 
-The effect of pre-extracted features is clear. Using the baseline's features, it is clear that Timesformer cannot produce a good representation of the egocentric setting of EPIC-KITCHENS, as the logistic regressor cannot produce a good boundary between classes. The same happens with mean-pooled CLIP features. However, using the latter, there is a clear gap in zero-shot retrieval performance, with an increase of +27.6% in R@10. This is explainable by the fact that, while CLIP (as a model for text-image retrieval) cannot model motion like TimeSformer, it is capable of producing good text representations that allow retrieval. On the other hand, EgoVLP+, fine-tuned on EPIC-KITCHENS 100 for the Multi-Instance Retrieval task, produces the best features so far, capable of high-performance zero-shot retrieval as well as being good for classification on verbs. 
+The effect of pre-extracted features is clear. Using the baseline's features, it is clear that Timesformer cannot produce a good representation of the egocentric setting of EPIC-KITCHENS, as the logistic regressor cannot produce a good boundary between classes. The same happens with mean-pooled CLIP features. However, using the latter, there is a clear gap in zero-shot retrieval performance, with an increase of +27.6% in MIR@10. This is explainable by the fact that, while CLIP (as a model for text-image retrieval) cannot model motion like TimeSformer, it is capable of producing good text representations that allow retrieval. On the other hand, EgoVLP+, fine-tuned on EPIC-KITCHENS 100 for the Multi-Instance Retrieval task, produces the best features so far, capable of high-performance zero-shot retrieval as well as being good for classification on verbs. 
 
 ### R@K on Validation set
 The following table shows metrics computed on the validation set for each trained model, highlighting the best one.
@@ -172,7 +167,7 @@ We presented a lightweight adapter-based architecture for text-video retrieval o
 ### 7.2 Use of Artificial Intelligence
 During the development of this project, AI tools (Gemini and Claude) were utilized as supportive aids to optimize our workflow and accelerate development. Specifically, they assisted us in the following areas:
 
-* **Code Integration:** Adapting and integrating the EgoVLP  code from the original external repository into our project, specifically to perform feature extraction;
+* **Code Integration:** Adapting and integrating the EgoVLP code from the original external repository into our project, specifically to perform feature extraction;
 * **Code Quality:** Performing general code refactoring and cleanup to improve overall readability, structure, and maintainability.
 * **Framework Documentation:** Acting as a rapid search and consultation tool to quickly understand specific functionalities, boilerplate requirements, and best practices within the PyTorch Lightning framework.
 
