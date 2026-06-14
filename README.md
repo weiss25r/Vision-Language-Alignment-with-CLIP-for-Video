@@ -9,11 +9,11 @@
 |---|---|
 | **Group** | Justgood AI |
 | **Project ID** | 15 |
-| **Members** | Edoardo Tantari, Raffaele Terracino |
+| **Members** | [Edoardo Tantari](https://github.com/eddy2809), [Raffaele Terracino](https://github.com/weiss25r)
 
 ## 📝 Project Description
 
-Searching for videos traditionally relies on manually curated metadata rather than visual content. This project explores zero-shot cross-modal retrieval by aligning video features with natural language text using a contrastive loss model reminiscent of CLIP.
+Searching for videos traditionally relies on manually curated metadata rather than visual content. This project explores zero-shot cross-modal retrieval by aligning video features with natural language text using a contrastive loss model reminiscent of CLIP. The goal is to build a neural architecture that, given an arbitrary text query such as "person holding a flag on a mountain peak", retrieves the semantically matching clip from a large video collection — with no manual labels and no fine-tuning on the target domain. This is the text-video retrieval problem, and this project explores it using the EPIC-KITCHENS 100 dataset.
 
 Project done as part of the course [**Deep Learning — Advanced Models and Methods**](https://antoninofurnari.github.io/deeplearning/) at University of Catania.
 
@@ -62,16 +62,15 @@ python src/training/trainer.py --config experiments/configs/experiment.yaml
 
 Resume from a checkpoint with `--ckpt <path_to_checkpoint>`.
 
-Six config files are provided:
+Five config files are provided, one for each experiment described in the technical report:
 
-| Config | Description |
+| Config | Experiment |
 |---|---|
-| `MLP_timesformer_config.yaml` | Baseline training |
-| `linear_timesformer_config.yaml` | Best model training |
-| `full_fine_tuning_config.yaml` | Best model training |
-| `CLIP_config.yaml` | Best model training |
-| `egovlp_plus_cliploss_config.yaml` | Best model training |
-| `egovlp_egonceloss_config.yaml` | Best model training |
+| `MLP_timesformer_config.yaml` | Baseline |
+| `full_fine_tuning_config.yaml` | Encoders fine-tuning |
+| `CLIP_config.yaml` | CLIP features + adapter |
+| `egovlp_plus_cliploss_config.yaml` | EgoVLP+ fine-tuned + adapter |
+| `egovlp_egonceloss_config.yaml` | EgoVLP+ and EgoNCE loss + adapter|
 
 Each experiment produces two checkpoints: `last` (final epoch) and `best` (lowest validation loss).
 
