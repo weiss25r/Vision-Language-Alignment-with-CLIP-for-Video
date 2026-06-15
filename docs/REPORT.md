@@ -207,7 +207,7 @@ During the development of this project, AI tools (Gemini and Claude) were utiliz
 * **Code Quality:** Performing general code refactoring and cleanup to improve overall readability, structure, and maintainability.
 * **Framework Documentation:** Acting as a rapid search and consultation tool to quickly understand specific functionalities, boilerplate requirements, and best practices within the PyTorch Lightning framework.
 
-- **Illustrative diagrams generaton**: Generating high-quality illustrative diagrams for presentation needs.
+- **Illustrative diagrams generation**: Generating high-quality illustrative diagrams for presentation needs.
 
 While these tools significantly aided in writing boilerplate code and resolving minor bugs, the core architectural design, the experimental setup, and the ultimate responsibility for the project's results and integrity remain strictly our own.
 
