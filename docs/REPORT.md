@@ -62,13 +62,13 @@ $$\text{MIR@K} = \frac{1}{N} \sum_{i=1}^{N} \mathbf{1}\left[\exists\, j \in \tex
 The formula is translated into code in file `src/evaluation/metrics.py`
 
 ### Experiments
-To improve our baseline, we perform a series of experiments. The seed is set to 42 for all experiments for reproducibility. Hyperparameters for each experiment are provided in the `experiments/configs` folder. The model with the highest MIR@1 on the validation set is finally evaluated on the test set, concluding the experimental phase.
+To improve our baseline, we perform a series of experiments. The seed is set to 42 for all experiments for reproducibility. Hyperparameters for each experiment are provided in the `experiments/configs` folder. The model with the highest MIR@1 on the validation set is finally evaluated on the test set, concluding the experimental phase. Early stopping and checkpointing on the lowest validation loss are also implemented in all settings. "Best" checkpoints are then used to compute metrics.
 
 #### Fine-tuning
 In this setting, we fine-tune DistilBERT and the last layer of TimeSformer on EPIC KITCHENS. In this setting, we use a simple adapter consisting of a single linear layer to avoid losing pre-training information. TimeSformer's learning rate is set as $1/10$ of DistilBERT's. During training, we perform temporal data augmentation. Since Timesformer works with videos of 8 frames, we divide each clip into 8 bins and randomly select a frame as a representative for each bin. We also use a cosine learning rate scheduler with warmup. The full model is implemented in `src/model/clip.py`
 
 #### Changing frozen encoders
-We try to change the input features while maintaining the same Adapter layout. We first switch to original CLIP, using its text encoder and image encoder. To perform video encoding, we take the mean pooling of the encoded frames. We then try using EgoVLP+ encoders, fine-tuned on EPIC-Kitchens. 
+We try to change the input features while maintaining the same Adapter layout. We first switch to original CLIP, using its text encoder and image encoder. To perform video encoding, we take the mean pooling of the encoded frames. We then try using [EgoVLP+](https://arxiv.org/abs/2206.01670) encoders, fine-tuned on EPIC-Kitchens. 
 
 To start each experiment concerning features, we perform two sanity checks before training:
 - a zero-shot evaluation, where we evaluate Recall@K without the Adapter module
@@ -114,7 +114,8 @@ We report quantitative results for each experiment, including sanity checks on f
 The effect of pre-extracted features is clear. Using the baseline's features, it is clear that Timesformer cannot produce a good representation of the egocentric setting of EPIC-KITCHENS, as the logistic regressor cannot produce a good boundary between classes. The same happens with mean-pooled CLIP features. However, using the latter, there is a clear gap in zero-shot retrieval performance, with an increase of +27.6% in MIR@10. This is explainable by the fact that, while CLIP (as a model for text-image retrieval) cannot model motion like TimeSformer, it is capable of producing good text representations that allow retrieval. On the other hand, EgoVLP+, fine-tuned on EPIC-KITCHENS 100 for the Multi-Instance Retrieval task, produces the best features so far, capable of high-performance zero-shot retrieval as well as being good for classification on verbs. 
 
 ### R@K on Validation set
-The following table shows metrics computed on the validation set for each trained model, highlighting the best one.
+The following table shows metrics computed on the validation set for each trained model, highlighting the best one. **Results are based on the "best" checkpoint for each model, the one with the lowest validation loss.**
+
 
 | Experiment | R@1 | R@5 | R@10 |
 | --- | --- | --- | --- |
@@ -123,6 +124,36 @@ The following table shows metrics computed on the validation set for each traine
 | CLIP features | 21.0 | 44.3 | 55.0 |
 | EgoVLP+ CLIP loss | 64.7 | 84.6 | 89.6 |
 | **EgoVLP+ egonce loss** | **68.9** | **84.1** | **88.2** |
+
+### Figures
+The following graphs show how validation losses and MIR@1 changes over time during training.
+<table>
+<tr>
+<td width="50%">
+
+<img src="../figures/loss_frozen.png" width="100%">
+
+</td>
+<td width="50%">
+
+<img src="../figures/loss_finetuning.png" width="100%">
+
+</td>
+</tr>
+
+<tr>
+<td width="50%">
+
+<img src="../figures/recall_frozen.png" width="100%">
+
+</td>
+<td width="50%">
+
+<img src="../figures/recall_finetuning.png" width="100%">
+
+</td>
+</tr>
+</table>
 
 ### Comments
 Fine-tuning TimeSformer's last layer and full fine-tuning DistilBERT seem to destroy the encoders' capabilities, as metrics are very similar to the baseline. Furthermore, training this architecture is highly time-consuming, taking approximately 12 minutes per epoch using our machine. This experiment led us to completely abandon fine-tuning approaches. CLIP features - as opposed to their good sanity checks - perform clearly worse than our baseline. Our intuition is that while CLIP's text encoder provided good representations for our narrations, as demonstrated by the sanity check, the video embeddings are not representative and as such are easily destroyed by the adapter. 
