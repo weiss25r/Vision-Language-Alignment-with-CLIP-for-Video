@@ -1,59 +1,91 @@
-> **NOTE: This file is the official template for the technical README of your repository.**  
-> Before starting, make sure you have carefully read the **[INSTRUCTIONS.md](INSTRUCTIONS.md)**.  
-> This file must contain **exclusively the technical aspects** of the project (Setup, Run, baseline Results). The textual and theoretical report should be placed in the **[`docs/REPORT.md`](docs/REPORT.md)** file.
-> *Delete this note block before submission.*
-
-# Vision-Language-Alignment-with-CLIP-for-Video
+# Vision-Language Alignment with CLIP for Video
 
 [![Report](https://img.shields.io/badge/Paper-REPORT.md-blue)](docs/REPORT.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## 👥 Group and Project Information
-- **Group ID**: Justgood AI 
-- **Project ID**: 15
+
+| | |
+|---|---|
+| **Group** | Justgood AI |
+| **Project ID** | 15 |
+| **Members** | [Edoardo Tantari](https://github.com/eddy2809), [Raffaele Terracino](https://github.com/weiss25r)
 
 ## 📝 Project Description
-Searching for videos traditionally relies on manually curated metadata rather than visual content. This project explores zero-shot cross-modal retrieval by aligning video features with natural language text using a contrastive loss model reminiscent of CLIP.*
 
-> 📖 **Official Report**: For all theoretical details, performance analysis, the architecture used, and group contributions, please refer to our formal paper: **[REPORT.md](docs/REPORT.md)**.
+Searching for videos traditionally relies on manually curated metadata rather than visual content. This project explores zero-shot cross-modal retrieval by aligning video features with natural language text using a contrastive loss model reminiscent of CLIP. The goal is to build a neural architecture that, given an arbitrary text query such as "person holding a flag on a mountain peak", retrieves the semantically matching clip from a large video collection — with no manual labels and no fine-tuning on the target domain. This is the text-video retrieval problem, and this project explores it using the EPIC-KITCHENS 100 dataset.
 
-## 🛠 Technical Reproducibility
+Project done as part of the course [**Deep Learning — Advanced Models and Methods**](https://antoninofurnari.github.io/deeplearning/) at University of Catania.
 
-### 1. Data and Environment Setup
-
-**Prerequisites:**
-Explain how the reader can install the environment to run your code.
-
-```bash
-git clone https://github.com/yourusername/your-repo.git
-cd your-repo
-conda env create -f environment.yml
-conda activate dl-project
-```
-
-**Dataset:**
-Explain in 2 lines where to download the data from and in which folder it needs to reside (e.g., `data/raw/`).
-
-### 2. Network Training
-Provide the **exact commands** to start the training.
-
-**Baseline Training:**
-```bash
-python -m src.training.train --config experiments/configs/baseline.yaml
-```
-
-**Improved Model Training:**
-```bash
-python -m src.training.train --config experiments/configs/model_v1.yaml
-```
-
-### 3. Evaluation
-Provide the commands to reproduce the numbers in your summary table.
-
-```bash
-python -m src.evaluation.evaluate --config experiments/configs/model_v1.yaml
-```
+> 📖 **Official Report**: For theoretical details, performance analysis, architecture, and group contributions, see **[REPORT.md](docs/REPORT.md)**.
 
 ---
 
-*For the declaration of individual tasks and the use of AI, refer to `docs/REPORT.md`.*
+## 🛠 Tecnical Reproducibility
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/<your-username>/vision-language-alignment.git
+cd vision-language-alignment
+```
+
+### 2. Create the conda environment
+
+```bash
+conda env create -f environment.yml
+conda activate vla
+```
+
+### 3. Install PyTorch
+
+PyTorch is **not** included in `environment.yml` to keep the environment hardware-agnostic. Install it manually based on your hardware. We used `torch 2.11.0`. 
+
+---
+
+##  Data Setup
+
+To replicate the full pipeline, download the [Epic Kitchens dataset](https://academictorrents.com/details/c92b4a3cd3834e9af9666ac82379ff15ca289a83) and follow the "Data" section of the technical report.
+
+If you only want to replicate baseline and best model training, download our pre-extracted features [here](https://github.com/weiss25r/Vision-Language-Alignment-with-CLIP-for-Video/releases/download/v1.0.0/Pre-extracted.features.zip) 
+— no need to process the raw dataset.
+
+---
+
+##  Training
+
+Start training with:
+
+```bash
+python src/training/trainer.py --config experiments/configs/experiment.yaml
+```
+
+Resume from a checkpoint with `--ckpt <path_to_checkpoint>`.
+
+Five config files are provided, one for each experiment described in the technical report:
+
+| Config | Experiment |
+|---|---|
+| `MLP_timesformer_config.yaml` | Baseline |
+| `full_fine_tuning_config.yaml` | Encoders fine-tuning |
+| `CLIP_config.yaml` | CLIP features + adapter |
+| `egovlp_plus_cliploss_config.yaml` | EgoVLP+ fine-tuned + adapter |
+| `egovlp_egonceloss_config.yaml` | EgoVLP+ and EgoNCE loss + adapter (best model)|
+
+Each experiment produces two checkpoints: `last` (final epoch) and `best` (lowest validation loss).
+
+---
+
+## Evaluation
+
+Evaluate a trained model on the test set:
+
+```bash
+python src/evaluation/evaluate.py --config experiments/configs/experiment.yaml --ckpt <path_to_checkpoint> --test
+```
+
+Run inference on the validation set with `--validate` instead of `--test`.
+
+---
+
+*For the declaration of individual tasks and use of AI tools, refer to [`docs/REPORT.md`](docs/REPORT.md).*
