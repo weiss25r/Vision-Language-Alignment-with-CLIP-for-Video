@@ -12,7 +12,7 @@ from src.models.encoders import VideoEncoder, TextEncoder
 from transformers import DistilBertModel, TimesformerModel
 
 from lightning.pytorch import LightningModule
-from ..evaluation.metrics import compute_recall, compute_multi_instance_recall
+from ..evaluation.metrics import compute_multi_instance_recall
 
 from torch.optim import AdamW
 

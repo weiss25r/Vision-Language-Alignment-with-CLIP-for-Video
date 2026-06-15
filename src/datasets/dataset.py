@@ -59,9 +59,9 @@ class EpicKitchensFramesDataset(Dataset):
         
         #random for training, center for validation
         if self.mode == 'train':
-            frame_indices = get_uniform_frame_indices(row['start_frame'], row['stop_frame'], num_frames=16, strategy='random')
+            frame_indices = get_uniform_frame_indices(row['start_frame'], row['stop_frame'], num_frames=8, strategy='random')
         else:
-            frame_indices = get_uniform_frame_indices(row['start_frame'], row['stop_frame'], num_frames=16, strategy='center')
+            frame_indices = get_uniform_frame_indices(row['start_frame'], row['stop_frame'], num_frames=8, strategy='center')
 
         video_dir = os.path.join(self.frames_dir, video_id)
         

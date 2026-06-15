@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from lightning.pytorch import LightningModule
 from torch.optim import AdamW
 
-from ..evaluation.metrics import compute_recall, compute_multi_instance_recall
+from ..evaluation.metrics import compute_multi_instance_recall
 from lightning.pytorch.loggers import WandbLogger
 
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR
