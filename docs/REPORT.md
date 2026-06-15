@@ -40,11 +40,13 @@ The following table summarizes the statistics for each set.
 ## 4. Methodology and Architecture
 
 ### Baseline architecture
-For our baseline, we choose [TimeSformer](paper) as the video encoder and [DistilBERT](paper) as the text encoder. The choice is motivated by the necessity of having a powerful video encoder, which translates into a time-consuming architecture, and a text encoder capable of correctly capturing the semantics of narrations while not consuming too much time and energy. Since both encoders are frozen in the baseline, we perform offline feature extraction on sets to speed up training. 
+For our baseline, we choose [TimeSformer](https://arxiv.org/abs/2102.05095) as the video encoder and [DistilBERT](https://arxiv.org/abs/1910.01108) as the text encoder. The choice is motivated by the necessity of having a powerful video encoder, which translates into a time-consuming architecture, and a text encoder capable of correctly capturing the semantics of narrations while not consuming too much time and energy. Since both encoders are frozen in the baseline, we perform offline feature extraction on sets to speed up training. 
 
-For DistilBERT, we take the mean pooling of the last layer for each narration. This is motivated by the absence of the Next-Sentence prediction task in DistilBERT's pre-training. To extract features with TimeSformer base, which works at a temporal resolution of 8 frames, we divide each clip into 8 bins and choose the central frame as its representative. To extract the final embedding, we directly use the [CLS] token. This is done automatically in the script `src/dataset/features_extraction.py`, in which we use the default "distilbert-base-uncased" model and "timesformer-base-finetuned-k600", both included within the HuggingFace transformers library. 
+For DistilBERT, we take the mean pooling of the last layer for each narration. This is motivated by the absence of the Next-Sentence prediction task in DistilBERT's pre-training. To extract features with TimeSformer base, which works at a temporal resolution of 8 frames, we divide each clip into 8 bins and choose the central frame as its representative. To extract the final embedding, we directly use the [CLS] token. This is done automatically in the script `src/datasets/features_extraction.py`, in which we use the default [distilbert-base-uncased](https://huggingface.co/distilbert/distilbert-base-uncased) model and [timesformer-base-finetuned-k600](https://huggingface.co/facebook/timesformer-base-finetuned-k600), both included within the HuggingFace transformers library. 
 
-On top of Timesformer and DistilBERT features, we train an adapter consisting of two independent MLPs with one hidden layer. The adapter's purpose is to align the text embedding space with the video one. The structure is typical of MLPs: hidden layer, layer normalization, dropout, output layer. The adapter is trained using a contrastive loss exactly as implemented in the [CLIP paper](paper). As in CLIP, temperature is a learnable parameter initialized as $\log(1/0.07)$. Hyperparameters for the baseline are provided in `experiments/configs/MLP_timesformer_config.yaml`.
+In our implementation, we define two Pytorch Dataset classes: EpicKitchensFramesDataset to load raw frames for performing feature extraction, and EpicKitchensFeaturesDataset to load pre-extracted features for our baseline. Lightning DataModules for these classes are also defined. This is done in `src/datasets/dataset.py`
+
+On top of Timesformer and DistilBERT features, we train an adapter consisting of two independent MLPs with one hidden layer. The adapter's purpose is to align the text embedding space with the video one. The structure is typical of MLPs: hidden layer, layer normalization, dropout, output layer. The adapter is trained using a contrastive loss exactly as implemented in the [CLIP paper](https://arxiv.org/abs/2103.00020). As in CLIP, temperature is a learnable parameter initialized as $\log(1/0.07)$. Our baseline is implemented as a LightningModule in `src/models/adapter.py`.Hyperparameters for the baseline are provided in `experiments/configs/MLP_timesformer_config.yaml`. 
 
 ### Evaluation metrics
 To perform model selection and evaluate our models, we compute Multi-Instance Recall. Standard Recall@K assumes a single relevant item per query in the gallery, which is unrealistic in EPIC-KITCHENS where multiple clips can depict the same action. We therefore adopt **Multi-Instance Recall@K**, which considers a query successful if at least one of the top-K retrieved items is semantically equivalent to it.
@@ -57,11 +59,13 @@ The metric is then computed as:
 
 $$\text{MIR@K} = \frac{1}{N} \sum_{i=1}^{N} \mathbf{1}\left[\exists\, j \in \text{top-K}(i) : \text{match}(i,j) = 1\right]$$
 
+The formula is translated into code in file `src/evaluation/metrics.py`
+
 ### Experiments
 To improve our baseline, we perform a series of experiments. The seed is set to 42 for all experiments for reproducibility. Hyperparameters for each experiment are provided in the `experiments/configs` folder. The model with the highest MIR@1 on the validation set is finally evaluated on the test set, concluding the experimental phase.
 
 #### Fine-tuning
-In this setting, we fine-tune DistilBERT and the last layer of TimeSformer on EPIC KITCHENS. In this setting, we use a simple adapter consisting of a single linear layer to avoid losing pre-training information. TimeSformer's learning rate is set as $1/10$ of DistilBERT's. During training, we perform temporal data augmentation. Since Timesformer works with videos of 8 frames, we divide each clip into 8 bins and randomly select a frame as a representative for each bin.
+In this setting, we fine-tune DistilBERT and the last layer of TimeSformer on EPIC KITCHENS. In this setting, we use a simple adapter consisting of a single linear layer to avoid losing pre-training information. TimeSformer's learning rate is set as $1/10$ of DistilBERT's. During training, we perform temporal data augmentation. Since Timesformer works with videos of 8 frames, we divide each clip into 8 bins and randomly select a frame as a representative for each bin. We also use a cosine learning rate scheduler with warmup. The full model is implemented in `src/model/clip.py`
 
 #### Changing frozen encoders
 We try to change the input features while maintaining the same Adapter layout. We first switch to original CLIP, using its text encoder and image encoder. To perform video encoding, we take the mean pooling of the encoded frames. We then try using EgoVLP+ encoders, fine-tuned on EPIC-Kitchens. 
@@ -70,7 +74,9 @@ To start each experiment concerning features, we perform two sanity checks befor
 - a zero-shot evaluation, where we evaluate Recall@K without the Adapter module
 - training of a logistic classifier on verbs
 
-Sanity checks allow us to answer the question "how good are the input features?" prior to training and are performed on the validation set.
+Sanity checks allow us to answer the question "how good are the input features?" prior to training and are performed on the validation set. Sanity checks are performed via Jupyter Notebooks `notebooks/zeroshot_eval.py` and `notebooks/train_classifier.py 
+
+Feature extraction with CLIP and EgoVLP+ is done via scripts `src/dataset/clip_fe.py` and `src/dataset/egovlp_fe.py`.
 
 #### Changing the loss
 Coherently with the choice of trying EgoVLP+ features, we switch from the standard CLIP loss to a contrastive loss inspired by EgoNCE, simplified to use only action-aware positive sampling, without the scene-aware negative sampling of the original work.
@@ -94,7 +100,6 @@ The full loss is the average of the symmetric video-to-text and text-to-video te
 $$\mathcal{L}^{\text{ego}} = \frac{1}{2}\left(\mathcal{L}^{\text{ego}}_{v2t} + \mathcal{L}^{\text{ego}}_{t2v}\right)$$
 
 where $\mathbf{v}_i$ and $\mathbf{t}_i$ are L2-normalized video and text embeddings, and $\tau$ is the temperature, which we make configurable to be a hyperparameter or a learnable parameter initialized to $\log(1/0.05)$.
-
 
 ## 5. Results and Discussion
 We report quantitative results for each experiment, including sanity checks on features and evaluation metrics of trained models.
