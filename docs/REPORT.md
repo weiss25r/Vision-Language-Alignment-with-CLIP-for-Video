@@ -208,3 +208,12 @@ During the development of this project, AI tools (Gemini and Claude) were utiliz
 * **Framework Documentation:** Acting as a rapid search and consultation tool to quickly understand specific functionalities, boilerplate requirements, and best practices within the PyTorch Lightning framework.
 
 While these tools significantly aided in writing boilerplate code and resolving minor bugs, the core architectural design, the experimental setup, and the ultimate responsibility for the project's results and integrity remain strictly our own.
+
+### 7.3 References
+
+| Architecture | Reference |
+| --- | --- |
+| DistilBERT | Sanh et al., *"DistilBERT, a distilled version of BERT: smaller, faster, cheaper and lighter"*, 2019 |
+| TimeSformer | Bertasius et al., *"Is Space-Time Attention All You Need for Video Understanding?"*, ICML 2021 |
+| CLIP | Radford et al., *"Learning Transferable Visual Models From Natural Language Supervision"*, ICML 2021 |
+| EgoVLP | Lin et al., *"EgoVLP: Learning Vision-Language Representations from Egocentric Videos"*, CVPR 2022 |
