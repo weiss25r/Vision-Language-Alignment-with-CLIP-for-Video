@@ -92,8 +92,8 @@ def print_top10_r1_errors(all_video, all_text, meta, split_name):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', type=str, required=True,  help='Path al config YAML')
-    parser.add_argument('--ckpt',   type=str, required=True,  help='Path al checkpoint .ckpt')
+    parser.add_argument('--config', type=str, required=True,  help='Path to config YAML')
+    parser.add_argument('--ckpt',   type=str, required=True,  help='Path to checkpoint .ckpt')
     parser.add_argument('--batch_size', type=int, default=256)
     parser.add_argument('--num_workers', type=int, default=4)
     args = parser.parse_args()
