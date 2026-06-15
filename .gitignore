@@ -5,7 +5,8 @@ env/
 __pycache__/
 *.pyc
 
-data/
+data/features/
+data/raw
 experiments/logs/
 experiments/checkpoints/
 
