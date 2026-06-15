@@ -197,8 +197,8 @@ We presented a lightweight adapter-based architecture for text-video retrieval o
 ## 7. Additional Information
 
 ### 7.1 Contribution Breakdown
-- **Edoardo Tantari**: data collection, video/text encoder classes, feature extraction (Baseline, CLIP, EgoVLP+), experiment configurations, presentation.
-- **Raffaele Terracino**: dataset classes, alignment module, loss functions, evaluation metrics, CLI interface, report writing.
+- **Edoardo Tantari**: data collection, video/text encoder classes, feature extraction (Baseline, CLIP, EgoVLP+), experiment configurations and runs, presentation.
+- **Raffaele Terracino**: dataset classes, models classes, evaluation metrics, CLI interface, report writing.
 
 ### 7.2 Use of Artificial Intelligence
 During the development of this project, AI tools (Gemini and Claude) were utilized as supportive aids to optimize our workflow and accelerate development. Specifically, they assisted us in the following areas:
