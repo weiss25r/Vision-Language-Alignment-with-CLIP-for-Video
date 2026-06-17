@@ -87,3 +87,6 @@ urllib3>=2.7
 tqdm>=4.67
 setuptools>=70.2
 packaging>=26.0
+
+# Web app
+streamlit>=1.45
