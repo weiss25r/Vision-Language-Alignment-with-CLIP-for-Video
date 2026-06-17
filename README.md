@@ -47,7 +47,7 @@ PyTorch is **not** included in `environment.yml` to keep the environment hardwar
 
 To replicate the full pipeline, download the [Epic Kitchens dataset](https://academictorrents.com/details/c92b4a3cd3834e9af9666ac82379ff15ca289a83) and follow the "Data" section of the technical report.
 
-If you only want to replicate baseline and best model training, download our pre-extracted features [here](https://github.com/weiss25r/Vision-Language-Alignment-with-CLIP-for-Video/releases/download/v1.0.0/Pre-extracted.features.zip) 
+If you only want to replicate baseline and best model training, download our pre-extracted features [here}(https://github.com/weiss25r/Vision-Language-Alignment-with-CLIP-for-Video/releases/tag/v1.0.0) 
 — no need to process the raw dataset.
 
 ---
@@ -90,7 +90,7 @@ Run inference on the validation set with `--validate` instead of `--test`.
 
 ## Demo
 ### Setup
-To run the streamlit demo web-app, download pre-computed video embeddings and the model ready for inference from [here]() and place them into the app folder. Embeddings refers to split "test seen" of data. Run the app with:
+To run the streamlit demo web-app, download pre-computed video embeddings and the model ready for inference from [here](https://github.com/weiss25r/Vision-Language-Alignment-with-CLIP-for-Video/releases/tag/v1.0.0) and place them into the app folder. Embeddings refers to split "test seen" of data. Run the app with:
 ```bash
 streamlit run app/app.py
 ```
