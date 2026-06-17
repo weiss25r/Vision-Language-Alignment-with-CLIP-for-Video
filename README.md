@@ -88,4 +88,14 @@ Run inference on the validation set with `--validate` instead of `--test`.
 
 ---
 
+## Demo
+### Setup
+To run the streamlit demo web-app, download pre-computed video embeddings and the model ready for inference from [here]() and place them into the app folder. Embeddings refers to split "test seen" of data. Run the app with:
+```bash
+streamlit run app/app.py
+```
+
+### Screenshot
+![Elephant](figures/screenshot.png)
+
 *For the declaration of individual tasks and use of AI tools, refer to [`docs/REPORT.md`](docs/REPORT.md).*
